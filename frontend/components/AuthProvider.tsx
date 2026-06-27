@@ -12,6 +12,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { auth, db, googleProvider, initAnalytics } from "@/lib/firebase";
 
 type ProfilePayload = {
+  name?: string;
+  username?: string;
   profession?: string;
   workStart?: string;
   workEnd?: string;
@@ -45,18 +47,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
+    const dataToSave: any = {
+      uid: currentUser.uid,
+      email: currentUser.email,
+      photoURL: currentUser.photoURL,
+      provider: "google",
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp()
+    };
+
+    if (payload.name !== undefined) {
+      dataToSave.name = payload.name;
+    } else if (currentUser.displayName) {
+      dataToSave.name = currentUser.displayName;
+    }
+
+    if (payload.username !== undefined) {
+      dataToSave.username = payload.username;
+    }
+
+    const preferences: any = {};
+    if (payload.profession !== undefined) preferences.profession = payload.profession;
+    if (payload.workStart !== undefined) preferences.workStart = payload.workStart;
+    if (payload.workEnd !== undefined) preferences.workEnd = payload.workEnd;
+    if (payload.deepWorkHours !== undefined) preferences.deepWorkHours = payload.deepWorkHours;
+    if (payload.theme !== undefined) preferences.theme = payload.theme;
+
+    if (Object.keys(preferences).length > 0) {
+      dataToSave.preferences = preferences;
+    }
+
     await setDoc(
       doc(db, "users", currentUser.uid),
-      {
-        uid: currentUser.uid,
-        name: currentUser.displayName,
-        email: currentUser.email,
-        photoURL: currentUser.photoURL,
-        provider: "google",
-        preferences: payload,
-        updatedAt: serverTimestamp(),
-        createdAt: serverTimestamp()
-      },
+      dataToSave,
       { merge: true }
     );
   }, []);

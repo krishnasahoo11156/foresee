@@ -58,6 +58,8 @@ export default function OnboardingPage() {
   const handleStep2Submit = (e: React.FormEvent) => {
     e.preventDefault();
     saveUserProfile({
+      name,
+      username,
       profession,
       workStart,
       workEnd,
