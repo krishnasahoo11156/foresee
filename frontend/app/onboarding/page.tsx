@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Chrome, Lock, CheckCircle, Clock, Briefcase, ArrowRight, User, Sun, Moon } from "lucide-react";
-import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
 import { useTheme } from "@/components/ThemeProvider";
 
 export default function OnboardingPage() {
@@ -249,10 +248,18 @@ export default function OnboardingPage() {
       </div>
 
       <div className="onboarding-visual-col">
-        <div style={{ width: "100%", maxWidth: "480px" }}>
-          <ImagePlaceholder 
-            label="Interactive dashboard onboarding illustration" 
-            height="380px"
+        <div style={{ width: "100%", maxWidth: "480px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={theme === "light" ? "/onboarding1light.png" : "/onboarding1dark.png"} 
+            alt="ForeSee Onboarding illustration" 
+            style={{ 
+              maxWidth: "100%", 
+              height: "auto", 
+              borderRadius: "12px", 
+              objectFit: "contain",
+              transition: "opacity 0.25s ease",
+            }} 
           />
           <div style={{ marginTop: "24px", textAlign: "center" }}>
             <h3 style={{ fontSize: "16px", marginBottom: "8px" }}>Adaptive Productivity Engine</h3>
