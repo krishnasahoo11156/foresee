@@ -14,6 +14,7 @@ import { auth, db, googleProvider, initAnalytics } from "@/lib/firebase";
 type ProfilePayload = {
   name?: string;
   username?: string;
+  password?: string;
   profession?: string;
   workStart?: string;
   workEnd?: string;
@@ -64,6 +65,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (payload.username !== undefined) {
       dataToSave.username = payload.username;
+    }
+
+    if (payload.password !== undefined) {
+      dataToSave.password = payload.password;
     }
 
     const preferences: any = {};

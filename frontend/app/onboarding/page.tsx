@@ -60,6 +60,7 @@ export default function OnboardingPage() {
     saveUserProfile({
       name,
       username,
+      password,
       profession,
       workStart,
       workEnd,

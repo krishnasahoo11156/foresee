@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Eye, Chrome, CheckCircle, ArrowRight } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +14,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [googleConnecting, setGoogleConnecting] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(Boolean(user));
+  const [storedPassword, setStoredPassword] = useState("");
 
   // Form State
   const [name, setName] = useState(user?.displayName ?? "");
@@ -23,6 +26,22 @@ export default function LoginPage() {
       setGoogleConnected(true);
       setName(user.displayName ?? "");
       setUsername(user.email?.split("@")[0] ?? "");
+
+      const fetchProfile = async () => {
+        try {
+          const docRef = doc(db, "users", user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.name) setName(data.name);
+            if (data.username) setUsername(data.username);
+            if (data.password) setStoredPassword(data.password);
+          }
+        } catch (err) {
+          console.warn("Failed to fetch user credentials:", err);
+        }
+      };
+      fetchProfile();
     }
   }, [user]);
 
@@ -34,6 +53,15 @@ export default function LoginPage() {
       setGoogleConnected(true);
       setName(signedInUser.displayName ?? "");
       setUsername(signedInUser.email?.split("@")[0] ?? "");
+
+      const docRef = doc(db, "users", signedInUser.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.name) setName(data.name);
+        if (data.username) setUsername(data.username);
+        if (data.password) setStoredPassword(data.password);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Google sign-in failed.";
       setError(message);
@@ -48,6 +76,13 @@ export default function LoginPage() {
       setError("Please connect your Google account first.");
       return;
     }
+
+    if (storedPassword && password !== storedPassword) {
+      setError("Incorrect password. Please try again.");
+      setPassword(""); // Clear field for security
+      return;
+    }
+
     saveUserProfile({
       name,
       username
