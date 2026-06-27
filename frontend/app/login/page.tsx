@@ -130,6 +130,7 @@ export default function LoginPage() {
               borderRadius: "12px", 
               objectFit: "contain",
               transition: "opacity 0.25s ease",
+              paddingTop: "40px"
             }} 
           />
           <div style={{ marginTop: "24px", textAlign: "center" }}>
