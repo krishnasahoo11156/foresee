@@ -7,6 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { collection, query, onSnapshot, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { askCopilot, ProposedEvent } from "@/lib/geminiClient";
+import { syncEventsToGoogleCalendar } from "@/lib/googleCalendar";
 import { Task } from "@/lib/types";
 
 interface Message {
@@ -17,19 +18,20 @@ interface Message {
 }
 
 export default function CopilotPage() {
-  const { user, profile } = useAuth();
+  const { user, profile, signInWithGoogle } = useAuth();
   const [tasksList, setTasksList] = useState<Task[]>([]);
   const [calendarMappings, setCalendarMappings] = useState<any[]>([]);
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "copilot",
-      text: "Hello! I am your ForeSee AI Copilot. I analyze your tasks, onboarding preferences, and calendar in real-time. Ask me 'How should I complete my tasks?' or 'Plan my coding project' and I will structure a conflict-free focus schedule for you.",
+      text: "Hello! I am your ForeSee AI Copilot. I analyze your tasks, onboarding preferences, and calendar in real-time. Ask me 'How should I complete my tasks?' or 'Plan my coding project' and I will structure a focus schedule for you.",
       timestamp: new Date()
     }
   ]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [hasCalendarToken, setHasCalendarToken] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to tasks
@@ -46,6 +48,13 @@ export default function CopilotPage() {
       console.warn("Failed to subscribe to tasks list:", err);
     });
     return unsub;
+  }, [user]);
+
+  // Check for local storage calendar token
+  useEffect(() => {
+    if (user) {
+      setHasCalendarToken(!!localStorage.getItem(`google_calendar_token_${user.uid}`));
+    }
   }, [user]);
 
   // Subscribe to calendar mappings
@@ -106,8 +115,31 @@ export default function CopilotPage() {
     setLoading(true);
 
     try {
-      // 1. Create a calendar mapping log in Firestore
-      const mapRef = await addDoc(collection(db, "users", user.uid, "calendarMappings"), {
+      // 1. Sync to Google Calendar
+      let calendarSyncNote = "";
+      if (hasCalendarToken) {
+        const eventsToSync = events.map(e => ({
+          summary: e.title,
+          description: e.description,
+          startTime: e.startTime,
+          endTime: e.endTime
+        }));
+
+        const syncRes = await syncEventsToGoogleCalendar(user.uid, eventsToSync);
+        if (syncRes.success) {
+          calendarSyncNote = ` Successfully synchronized ${syncRes.count} events to your actual Google Calendar.`;
+        } else {
+          calendarSyncNote = ` Note: Calendar sync failed (${syncRes.error}).`;
+          if (!localStorage.getItem(`google_calendar_token_${user.uid}`)) {
+            setHasCalendarToken(false);
+          }
+        }
+      } else {
+        calendarSyncNote = " Note: Google Calendar sync is offline. Authorize calendar access below.";
+      }
+
+      // 2. Create a calendar mapping log in Firestore
+      await addDoc(collection(db, "users", user.uid, "calendarMappings"), {
         mappingId: `map_${Date.now()}`,
         syncTimestamp: new Date().toISOString(),
         status: "synced",
@@ -121,7 +153,7 @@ export default function CopilotPage() {
         createdAt: serverTimestamp()
       });
 
-      // 2. Perform any task shifts in the database
+      // 3. Perform any task shifts in the database
       for (const event of events) {
         if (event.shiftRequired && event.shiftedTaskId) {
           const shiftedTask = tasksList.find(t => t.id === event.shiftedTaskId || t.taskId === event.shiftedTaskId);
@@ -134,7 +166,7 @@ export default function CopilotPage() {
             
             await updateDoc(taskDocRef, {
               deadline: newDeadline.toISOString(),
-              behaviorState: "slipping", // mark behavior state as slipping because it was bumped
+              behaviorState: "slipping",
               lastActivity: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             });
@@ -143,7 +175,8 @@ export default function CopilotPage() {
         }
       }
 
-      setSuccessMessage(`Calendar Focus Blocks Synchronized Successfully! Added ${events.length} event(s) to Google Calendar.`);
+      setSuccessMessage(`Calendar Focus Blocks Synchronized Successfully!${calendarSyncNote}`);
+      
       // Clear proposed events in the chat log so they aren't double added
       setMessages(prev => prev.map(m => {
         if (m.proposedEvents === events) {
@@ -155,6 +188,16 @@ export default function CopilotPage() {
       console.error("Failed to write schedule events:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAuthorizeCalendar = async () => {
+    try {
+      await signInWithGoogle();
+      setHasCalendarToken(true);
+      setSuccessMessage("Google Calendar access authorized successfully!");
+    } catch (err) {
+      console.error("Calendar authorization failed:", err);
     }
   };
 
@@ -170,11 +213,40 @@ export default function CopilotPage() {
         </div>
       </div>
 
+      {/* Calendar Auth Banner */}
+      {!hasCalendarToken && (
+        <div 
+          className="card card-pad" 
+          style={{ 
+            background: "rgba(234,179,8,0.06)", 
+            border: "1px solid rgba(234,179,8,0.18)", 
+            display: "flex", 
+            justifyContent: "space-between", 
+            alignItems: "center", 
+            padding: "14px 20px", 
+            borderRadius: "10px", 
+            marginBottom: "28px" 
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <AlertTriangle size={18} style={{ color: "var(--warning)" }} />
+            <span style={{ fontSize: "13.5px" }}>Google Calendar sync is offline. Authorize calendar access to sync your schedules.</span>
+          </div>
+          <button 
+            onClick={handleAuthorizeCalendar} 
+            className="button button-secondary"
+            style={{ fontSize: "12px", padding: "6px 12px", minHeight: "auto" }}
+          >
+            Authorize Google Calendar
+          </button>
+        </div>
+      )}
+
       {successMessage && (
         <div className="card card-pad" style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.18)", color: "var(--success)", padding: "18px 24px", borderRadius: "12px", marginBottom: "28px", display: "flex", alignItems: "flex-start", gap: "12px" }}>
           <Check size={20} style={{ flexShrink: 0, marginTop: "2px" }} />
           <div>
-            <strong style={{ fontSize: "15px", display: "block", marginBottom: "4px" }}>Synced to Google Calendar</strong>
+            <strong style={{ fontSize: "15px", display: "block", marginBottom: "4px" }}>Status Notification</strong>
             <span style={{ fontSize: "13.5px" }}>{successMessage}</span>
           </div>
         </div>
@@ -247,13 +319,23 @@ export default function CopilotPage() {
                           })}
                         </div>
 
-                        <button 
-                          onClick={() => handleAddEvents(msg.proposedEvents!)}
-                          className="button button-primary" 
-                          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", height: "38px", fontSize: "13px" }}
-                        >
-                          Add Events to Calendar <ArrowRight size={14} />
-                        </button>
+                        {!hasCalendarToken ? (
+                          <button 
+                            onClick={handleAuthorizeCalendar}
+                            className="button button-secondary" 
+                            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", height: "38px", fontSize: "13px" }}
+                          >
+                            Authorize Google Calendar <ArrowRight size={14} />
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => handleAddEvents(msg.proposedEvents!)}
+                            className="button button-primary" 
+                            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", height: "38px", fontSize: "13px" }}
+                          >
+                            Add Events to Calendar <ArrowRight size={14} />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

@@ -5,7 +5,8 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signInWithRedirect,
-  signOut as firebaseSignOut
+  signOut as firebaseSignOut,
+  GoogleAuthProvider
 } from "firebase/auth";
 import { doc, serverTimestamp, setDoc, onSnapshot } from "firebase/firestore";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -168,6 +169,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const token = credential?.accessToken;
+      if (token) {
+        localStorage.setItem(`google_calendar_token_${result.user.uid}`, token);
+      }
       await saveUserProfile().catch((error) => {
         console.warn("Signed in, but profile sync failed:", error);
       });

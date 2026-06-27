@@ -3,22 +3,23 @@
 import { useState, useEffect } from "react";
 import { CheckCircle2, ShieldAlert, Sparkles, Calendar, AlertTriangle, Check, ArrowRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
 import { useAuth } from "@/components/AuthProvider";
 import { collection, query, onSnapshot, updateDoc, doc, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { calculateRiskAndClassification, generateRescueStrategies } from "@/lib/riskEngine";
+import { syncEventsToGoogleCalendar } from "@/lib/googleCalendar";
 import { Task, RescueStrategy } from "@/lib/types";
 import Link from "next/link";
 
 export default function RescuePage() {
-  const { user, profile } = useAuth();
+  const { user, profile, signInWithGoogle } = useAuth();
   const [tasksList, setTasksList] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState<string>("");
   const [selectedStrategyName, setSelectedStrategyName] = useState<string>("Focused Sprint");
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [hasCalendarToken, setHasCalendarToken] = useState(false);
 
   // Subscribe to tasks
   useEffect(() => {
@@ -36,6 +37,13 @@ export default function RescuePage() {
       setLoading(false);
     });
     return unsub;
+  }, [user]);
+
+  // Check for local storage calendar token
+  useEffect(() => {
+    if (user) {
+      setHasCalendarToken(!!localStorage.getItem(`google_calendar_token_${user.uid}`));
+    }
   }, [user]);
 
   // Identify critical or danger tasks
@@ -80,7 +88,31 @@ export default function RescuePage() {
     try {
       const chosenStrategy = strategies.find(s => s.name === selectedStrategyName) || strategies[0];
       
-      // 1. Create a rescue plan record in Firestore
+      // 1. Sync to actual Google Calendar via REST API if token is present
+      let calendarSyncNote = "";
+      if (hasCalendarToken) {
+        const eventsToSync = chosenStrategy.dailyWorkSchedule.map((block: any) => ({
+          summary: `${block.title}: Rescue Focus Block`,
+          description: `Automatically scheduled via ForeSee Rescue Engine. Strategy: ${chosenStrategy.name}`,
+          startTime: block.startTime,
+          endTime: block.endTime
+        }));
+
+        const syncRes = await syncEventsToGoogleCalendar(user.uid, eventsToSync);
+        if (syncRes.success) {
+          calendarSyncNote = ` Successfully synchronized ${syncRes.count} events to your Google Calendar.`;
+        } else {
+          calendarSyncNote = ` Note: Google Calendar sync failed (${syncRes.error}).`;
+          // If token was expired/invalid, reset token state
+          if (!localStorage.getItem(`google_calendar_token_${user.uid}`)) {
+            setHasCalendarToken(false);
+          }
+        }
+      } else {
+        calendarSyncNote = " Note: Google Calendar sync is currently offline. Authorize calendar access to sync schedule.";
+      }
+
+      // 2. Create a rescue plan record in Firestore
       const planRef = await addDoc(collection(db, "users", user.uid, "rescuePlans"), {
         planId: `plan_${Date.now()}`,
         taskId: activeTask.id || activeTask.taskId,
@@ -90,7 +122,7 @@ export default function RescuePage() {
         createdAt: serverTimestamp()
       });
 
-      // 2. Simulate calendar sync events by writing to calendarMappings collection
+      // 3. Simulate calendar sync events by writing to calendarMappings collection
       await addDoc(collection(db, "users", user.uid, "calendarMappings"), {
         mappingId: `map_${Date.now()}`,
         taskId: activeTask.id || activeTask.taskId,
@@ -101,7 +133,7 @@ export default function RescuePage() {
         source: "Rescue Engine"
       });
 
-      // 3. Update the task state to reflect rescue recovery in progress
+      // 4. Update the task state to reflect rescue recovery in progress
       const taskDocRef = doc(db, "users", user.uid, "tasks", activeTask.id || activeTask.taskId);
       await updateDoc(taskDocRef, {
         riskScore: Math.round(activeTask.riskScore * 0.5), // Halve the risk score upon committing to rescue
@@ -113,12 +145,22 @@ export default function RescuePage() {
       });
 
       // Show success
-      setSuccessMessage(`Rescue Action Complete! Accepted "${chosenStrategy.name}". Added ${chosenStrategy.dailyWorkSchedule.length} focus sessions to Google Calendar.`);
+      setSuccessMessage(`Rescue Action Complete! Accepted "${chosenStrategy.name}".${calendarSyncNote}`);
       setSelectedTaskId("");
     } catch (err) {
       console.error("Rescue plan action failed:", err);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleAuthorizeCalendar = async () => {
+    try {
+      await signInWithGoogle();
+      setHasCalendarToken(true);
+      setSuccessMessage("Google Calendar access authorized successfully!");
+    } catch (err) {
+      console.error("Calendar authorization failed:", err);
     }
   };
 
@@ -134,11 +176,40 @@ export default function RescuePage() {
         </div>
       </div>
 
+      {/* Calendar Auth Banner */}
+      {!hasCalendarToken && (
+        <div 
+          className="card card-pad" 
+          style={{ 
+            background: "rgba(234,179,8,0.06)", 
+            border: "1px solid rgba(234,179,8,0.18)", 
+            display: "flex", 
+            justifyContent: "space-between", 
+            alignItems: "center", 
+            padding: "14px 20px", 
+            borderRadius: "10px", 
+            marginBottom: "28px" 
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <AlertTriangle size={18} style={{ color: "var(--warning)" }} />
+            <span style={{ fontSize: "13.5px" }}>Google Calendar sync is offline. Authorize calendar access to sync your schedules.</span>
+          </div>
+          <button 
+            onClick={handleAuthorizeCalendar} 
+            className="button button-secondary"
+            style={{ fontSize: "12px", padding: "6px 12px", minHeight: "auto" }}
+          >
+            Authorize Google Calendar
+          </button>
+        </div>
+      )}
+
       {successMessage && (
         <div className="card card-pad" style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.18)", color: "var(--success)", padding: "18px 24px", borderRadius: "12px", marginBottom: "28px", display: "flex", alignItems: "flex-start", gap: "12px" }}>
           <CheckCircle2 size={20} style={{ flexShrink: 0, marginTop: "2px" }} />
           <div>
-            <strong style={{ fontSize: "15px", display: "block", marginBottom: "4px" }}>Success</strong>
+            <strong style={{ fontSize: "15px", display: "block", marginBottom: "4px" }}>Status Notification</strong>
             <span style={{ fontSize: "13.5px" }}>{successMessage}</span>
           </div>
         </div>
