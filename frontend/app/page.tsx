@@ -1,9 +1,17 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Moon, Sun } from "lucide-react";
 import { Brand } from "@/components/layout/Sidebar";
-import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
+import { useTheme } from "@/components/ThemeProvider";
 
 export default function LandingPage() {
+  const { theme, setTheme } = useTheme();
+
+  const toggleTheme = () => {
+    setTheme(theme === "light" ? "dark" : "light");
+  };
+
   return (
     <main className="hero">
       <nav className="marketing-nav">
@@ -13,7 +21,17 @@ export default function LandingPage() {
           <a href="#rescue">Rescue Solutions</a>
           <a href="#agents">Agents Registry</a>
         </div>
-        <Link className="button button-primary" href="/login">Open Demo</Link>
+        <div className="btn-row" style={{ gap: "12px", alignItems: "center" }}>
+          <button 
+            className="theme-switch-btn" 
+            onClick={toggleTheme} 
+            aria-label="Change theme"
+            title={`Toggle theme (currently ${theme})`}
+          >
+            {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
+          </button>
+          <Link className="button button-primary" href="/login">Open Demo</Link>
+        </div>
       </nav>
 
       <section className="hero-inner">
@@ -35,10 +53,18 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-          <ImagePlaceholder 
-            label="ForeSee Main Product Dashboard Screenshot / Concept Art" 
-            height="460px"
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "360px", width: "100%" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={theme === "light" ? "/landingpagelight.png" : "/landingpagedark.png"} 
+            alt="ForeSee Product Dashboard Preview" 
+            style={{ 
+              maxWidth: "100%", 
+              height: "auto", 
+              borderRadius: "12px", 
+              objectFit: "contain",
+              transition: "opacity 0.25s ease",
+            }} 
           />
         </div>
       </section>

@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Chrome, Lock, CheckCircle, Clock, Briefcase, ArrowRight, User } from "lucide-react";
+import { Chrome, Lock, CheckCircle, Clock, Briefcase, ArrowRight, User, Sun, Moon } from "lucide-react";
 import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
+import { useTheme } from "@/components/ThemeProvider";
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [step, setStep] = useState(1);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [googleConnecting, setGoogleConnecting] = useState(false);
@@ -48,7 +50,19 @@ export default function OnboardingPage() {
         <div style={{ maxWidth: "440px", width: "100%", margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
             <span className="eyebrow" style={{ margin: 0 }}>Onboarding</span>
-            <span className="muted" style={{ fontWeight: 600 }}>Step {step} of 2</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <button 
+                type="button"
+                className="theme-switch-btn" 
+                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+                aria-label="Change theme"
+                title={`Toggle theme (currently ${theme})`}
+                style={{ width: "30px", height: "30px", borderRadius: "6px" }}
+              >
+                {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
+              </button>
+              <span className="muted" style={{ fontWeight: 600 }}>Step {step} of 2</span>
+            </div>
           </div>
 
           {step === 1 ? (
