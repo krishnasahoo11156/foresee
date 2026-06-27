@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, Chrome, CheckCircle, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Chrome, CheckCircle, ArrowRight, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import { useTheme } from "@/components/ThemeProvider";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -111,143 +112,177 @@ export default function LoginPage() {
     router.push("/dashboard");
   };
 
+  const { theme, setTheme } = useTheme();
+
   return (
-    <main className="auth-page">
-      <section className="card auth-card stack" style={{ padding: "40px", gap: "20px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span className="brand-mark">
-            <Eye size={20} />
-          </span>
-          <span className="pill" style={{ fontSize: "11px" }}>
-            Firebase Auth
-          </span>
+    <main className="onboarding-page">
+      {/* Left Column: Visual Image */}
+      <div className="onboarding-visual-col">
+        <div style={{ width: "100%", maxWidth: "480px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={theme === "light" ? "/loginlight.png" : "/logindark.png"} 
+            alt="ForeSee Login illustration" 
+            style={{ 
+              maxWidth: "100%", 
+              maxHeight: "70%",
+              height: "auto", 
+              borderRadius: "12px", 
+              objectFit: "contain",
+              transition: "opacity 0.25s ease",
+            }} 
+          />
+          <div style={{ marginTop: "24px", textAlign: "center" }}>
+            <h3 style={{ fontSize: "16px", marginBottom: "8px" }}>Orchestrating Calm</h3>
+            <p className="muted" style={{ fontSize: "13px", lineHeight: "1.4" }}>
+              Log in to access your customized capacity profiles, Google Calendar focus blocks, and active timeline rescue recommendations.
+            </p>
+          </div>
         </div>
-        
-        <div style={{ margin: "8px 0 0" }}>
-          <p className="eyebrow" style={{ marginBottom: "6px" }}>
-            Welcome to ForeSee
-          </p>
-          <h1 style={{ fontSize: "26px", margin: "0 0 12px" }}>Sign in to your deadline cockpit.</h1>
-          <p className="lead" style={{ fontSize: "14px", lineHeight: "1.5" }}>
-            Connect your Google account and enter your password to authenticate.
-          </p>
-        </div>
+      </div>
 
-        <form onSubmit={handleLoginSubmit} className="stack" style={{ gap: "20px" }}>
-          <div>
-            {!googleConnected ? (
-              <button
+      {/* Right Column: Form Container */}
+      <div className="onboarding-form-col">
+        <div style={{ maxWidth: "440px", width: "100%", margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
+            <span className="eyebrow" style={{ margin: 0 }}>Login</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <button 
                 type="button"
-                className="button button-secondary"
-                disabled={googleConnecting}
-                onClick={handleGoogleConnect}
-                style={{ width: "100%", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}
+                className="theme-switch-btn" 
+                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+                aria-label="Change theme"
+                title={`Toggle theme (currently ${theme})`}
+                style={{ width: "30px", height: "30px", borderRadius: "6px" }}
               >
-                <Chrome size={18} />
-                <span>{googleConnecting ? "Connecting..." : "Connect Google Account"}</span>
+                {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
               </button>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--success)", fontSize: "13px", fontWeight: 500, background: "var(--surface-soft)", padding: "10px 14px", borderRadius: "8px" }}>
-                <CheckCircle size={16} />
-                <span>Google Account connected!</span>
-              </div>
-            )}
-            {error && (
-              <p className="muted" style={{ color: "var(--danger)", fontSize: "12px", marginTop: "8px" }}>
-                {error}
-              </p>
-            )}
+            </div>
+          </div>
+          
+          <div style={{ margin: "8px 0 24px" }}>
+            <h1 style={{ fontSize: "28px", margin: "0 0 8px" }}>Sign in to your deadline cockpit.</h1>
+            <p className="lead" style={{ fontSize: "14px", lineHeight: "1.5" }}>
+              Connect your Google account and enter your password to authenticate.
+            </p>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", width: "100%", margin: "4px 0" }}>
-            <div style={{ flex: 1, height: "1px", background: "var(--surface-line)" }}></div>
-            <span className="muted" style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Credentials</span>
-            <div style={{ flex: 1, height: "1px", background: "var(--surface-line)" }}></div>
-          </div>
-
-          <div className="stack" style={{ gap: "16px" }}>
-            <label className="label">
-              <span>Full name</span>
-              <input
-                required
-                className="input"
-                placeholder="e.g. Krish Sahoo"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-
-            <label className="label">
-              <span>Username</span>
-              <input
-                required
-                className="input"
-                placeholder="e.g. krishsahoo"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-            </label>
-
-            <label className="label">
-              <span>Password</span>
-              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                <input
-                  required
-                  type={showPassword ? "text" : "password"}
-                  className="input"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ paddingRight: "40px", width: "100%" }}
-                />
+          <form onSubmit={handleLoginSubmit} className="stack" style={{ gap: "20px" }}>
+            <div>
+              {!googleConnected ? (
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    setShowPassword(false);
-                  }}
-                  style={{
-                    position: "absolute",
-                    right: "12px",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--muted)",
-                    padding: 0,
-                    display: "flex",
-                    alignItems: "center"
-                  }}
-                  title="Click to toggle, double click to lock hidden"
+                  className="button button-secondary"
+                  disabled={googleConnecting}
+                  onClick={handleGoogleConnect}
+                  style={{ width: "100%", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}
                 >
-                  {showPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+                  <Chrome size={18} />
+                  <span>{googleConnecting ? "Connecting..." : "Connect Google Account"}</span>
                 </button>
-              </div>
-            </label>
-          </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--success)", fontSize: "13px", fontWeight: 500, background: "var(--surface-soft)", padding: "10px 14px", borderRadius: "8px" }}>
+                  <CheckCircle size={16} />
+                  <span>Google Account connected!</span>
+                </div>
+              )}
+              {error && (
+                <p className="muted" style={{ color: "var(--danger)", fontSize: "12px", marginTop: "8px" }}>
+                  {error}
+                </p>
+              )}
+            </div>
 
-          <button
-            type="submit"
-            className="button button-primary"
-            style={{ width: "100%", height: "44px", marginTop: "8px" }}
-          >
-            Log in <ArrowRight size={16} />
-          </button>
-        </form>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", width: "100%", margin: "4px 0" }}>
+              <div style={{ flex: 1, height: "1px", background: "var(--surface-line)" }}></div>
+              <span className="muted" style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Credentials</span>
+              <div style={{ flex: 1, height: "1px", background: "var(--surface-line)" }}></div>
+            </div>
 
-        <div style={{ textAlign: "center", marginTop: "8px", display: "flex", justifyContent: "space-between", fontSize: "12.5px" }}>
-          <div>
-            <span className="muted">New to the website? </span>
-            <Link href="/onboarding" style={{ textDecoration: "underline", color: "var(--accent)", fontWeight: 500 }}>
-              Sign up
+            <div className="stack" style={{ gap: "16px" }}>
+              <label className="label">
+                <span>Full name</span>
+                <input
+                  required
+                  className="input"
+                  placeholder="e.g. Krish Sahoo"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
+
+              <label className="label">
+                <span>Username</span>
+                <input
+                  required
+                  className="input"
+                  placeholder="e.g. krishsahoo"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </label>
+
+              <label className="label">
+                <span>Password</span>
+                <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                  <input
+                    required
+                    type={showPassword ? "text" : "password"}
+                    className="input"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{ paddingRight: "40px", width: "100%" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setShowPassword(false);
+                    }}
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--muted)",
+                      padding: 0,
+                      display: "flex",
+                      alignItems: "center"
+                    }}
+                    title="Click to toggle, double click to lock hidden"
+                  >
+                    {showPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              className="button button-primary"
+              style={{ width: "100%", height: "44px", marginTop: "8px" }}
+            >
+              Log in <ArrowRight size={16} />
+            </button>
+          </form>
+
+          <div style={{ textAlign: "center", marginTop: "16px", display: "flex", justifyContent: "space-between", fontSize: "12.5px" }}>
+            <div>
+              <span className="muted">New to the website? </span>
+              <Link href="/onboarding" style={{ textDecoration: "underline", color: "var(--accent)", fontWeight: 500 }}>
+                Sign up
+              </Link>
+            </div>
+            <Link href="/" className="muted" style={{ textDecoration: "underline" }}>
+              Go back to landing page
             </Link>
           </div>
-          <Link href="/" className="muted" style={{ textDecoration: "underline" }}>
-            Go back to landing page
-          </Link>
         </div>
-      </section>
+      </div>
     </main>
   );
 }

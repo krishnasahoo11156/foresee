@@ -363,6 +363,7 @@ export default function OnboardingPage() {
             alt="ForeSee Onboarding illustration" 
             style={{ 
               maxWidth: "100%", 
+              maxHeight: "340px",
               height: "auto", 
               borderRadius: "12px", 
               objectFit: "contain",
