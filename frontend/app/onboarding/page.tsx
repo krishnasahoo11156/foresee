@@ -3,9 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Chrome, Lock, CheckCircle, Clock, Briefcase, ArrowRight, User, Sun, Moon } from "lucide-react";
+import { Chrome, Lock, CheckCircle, Clock, Briefcase, ArrowRight, User, Sun, Moon, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -15,6 +17,7 @@ export default function OnboardingPage() {
   const [googleConnected, setGoogleConnected] = useState(Boolean(user));
   const [googleConnecting, setGoogleConnecting] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   
   // Form State
   const [name, setName] = useState(user?.displayName ?? "");
@@ -38,6 +41,15 @@ export default function OnboardingPage() {
     setGoogleConnecting(true);
     try {
       const signedInUser = await signInWithGoogle();
+      
+      const docRef = doc(db, "users", signedInUser.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists() && docSnap.data().password) {
+        setAuthError("You have already logged in with this account.");
+        setGoogleConnected(false);
+        return;
+      }
+
       setGoogleConnected(true);
       setName(signedInUser.displayName ?? "");
       setUsername(signedInUser.email?.split("@")[0] ?? "");
@@ -135,9 +147,18 @@ export default function OnboardingPage() {
                 </button>
 
                 {authError && (
-                  <p className="muted" style={{ color: "var(--danger)" }}>
-                    {authError}
-                  </p>
+                  <div className="muted" style={{ color: "var(--danger)", fontSize: "13px", lineHeight: "1.4" }}>
+                    {authError === "You have already logged in with this account." ? (
+                      <span>
+                        You have already logged in with this account. Please{" "}
+                        <Link href="/login" style={{ textDecoration: "underline", color: "var(--danger)", fontWeight: 700 }}>
+                          Log in here
+                        </Link>.
+                      </span>
+                    ) : (
+                      authError
+                    )}
+                  </div>
                 )}
 
                 {googleConnected && (
@@ -179,14 +200,40 @@ export default function OnboardingPage() {
 
                 <label className="label">
                   <span>Password</span>
-                  <input
-                    required={!googleConnected}
-                    type="password"
-                    className="input"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
+                  <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                    <input
+                      required={!googleConnected}
+                      type={showPassword ? "text" : "password"}
+                      className="input"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      style={{ paddingRight: "40px", width: "100%" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setShowPassword(false);
+                      }}
+                      style={{
+                        position: "absolute",
+                        right: "12px",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "var(--muted)",
+                        padding: 0,
+                        display: "flex",
+                        alignItems: "center"
+                      }}
+                      title="Click to toggle, double click to lock hidden"
+                    >
+                      {showPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+                    </button>
+                  </div>
                 </label>
               </div>
 

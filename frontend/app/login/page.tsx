@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Eye, Chrome, CheckCircle, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Chrome, CheckCircle, ArrowRight } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [googleConnecting, setGoogleConnecting] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(Boolean(user));
   const [storedPassword, setStoredPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Form State
   const [name, setName] = useState(user?.displayName ?? "");
@@ -189,14 +190,40 @@ export default function LoginPage() {
 
             <label className="label">
               <span>Password</span>
-              <input
-                required
-                type="password"
-                className="input"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                <input
+                  required
+                  type={showPassword ? "text" : "password"}
+                  className="input"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={{ paddingRight: "40px", width: "100%" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setShowPassword(false);
+                  }}
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--muted)",
+                    padding: 0,
+                    display: "flex",
+                    alignItems: "center"
+                  }}
+                  title="Click to toggle, double click to lock hidden"
+                >
+                  {showPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+                </button>
+              </div>
             </label>
           </div>
 
