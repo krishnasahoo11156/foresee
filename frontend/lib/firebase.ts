@@ -21,6 +21,7 @@ export const db = getFirestore(firebaseApp);
 
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
+googleProvider.addScope("https://www.googleapis.com/auth/calendar.events");
 
 export async function initAnalytics() {
   if (typeof window === "undefined") return null;
