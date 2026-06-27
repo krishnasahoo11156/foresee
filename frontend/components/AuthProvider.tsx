@@ -1,0 +1,98 @@
+"use client";
+
+import {
+  User,
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut as firebaseSignOut
+} from "firebase/auth";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { auth, db, googleProvider, initAnalytics } from "@/lib/firebase";
+
+type ProfilePayload = {
+  profession?: string;
+  workStart?: string;
+  workEnd?: string;
+  deepWorkHours?: string;
+  theme?: string;
+};
+
+type AuthContextValue = {
+  user: User | null;
+  loading: boolean;
+  signInWithGoogle: () => Promise<User>;
+  signOut: () => Promise<void>;
+  saveUserProfile: (payload?: ProfilePayload) => Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    initAnalytics().catch(() => null);
+    return onAuthStateChanged(auth, (nextUser) => {
+      setUser(nextUser);
+      setLoading(false);
+    });
+  }, []);
+
+  const saveUserProfile = useCallback(async (payload: ProfilePayload = {}) => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    await setDoc(
+      doc(db, "users", currentUser.uid),
+      {
+        uid: currentUser.uid,
+        name: currentUser.displayName,
+        email: currentUser.email,
+        photoURL: currentUser.photoURL,
+        provider: "google",
+        preferences: payload,
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp()
+      },
+      { merge: true }
+    );
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      await saveUserProfile().catch((error) => {
+        console.warn("Signed in, but profile sync failed:", error);
+      });
+      return result.user;
+    } catch (error) {
+      console.warn("signInWithPopup blocked or failed. Falling back to signInWithRedirect:", error);
+      await signInWithRedirect(auth, googleProvider);
+      return new Promise<User>(() => {}); // Hold execution until redirect initiates
+    }
+  }, [saveUserProfile]);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      loading,
+      signInWithGoogle,
+      signOut: () => firebaseSignOut(auth),
+      saveUserProfile
+    }),
+    [user, loading, signInWithGoogle, saveUserProfile]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+  return context;
+}

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Sun, Moon } from "lucide-react";
+import { LogOut, Search, Sun, Moon } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
 import { Brand, Sidebar } from "@/components/layout/Sidebar";
 import { useTheme } from "@/components/ThemeProvider";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useTheme();
+  const { user, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -18,6 +20,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setTheme(theme === "light" ? "dark" : "light");
   };
 
+  const initials = user?.displayName
+    ?.split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() ?? "FS";
+
   return (
     <div className="shell">
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
@@ -28,7 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button className="theme-switch-btn" onClick={toggleTheme} aria-label="Change theme">
               {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
             </button>
-            <div className="avatar">KS</div>
+            <div className="avatar">{initials}</div>
           </div>
         </div>
         <header className="topbar">
@@ -48,9 +57,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
             <a className="button button-secondary" href="/tasks">New task</a>
             <a className="user-chip" href="/profile" aria-label="Open profile">
-              <span className="avatar">KS</span>
-              <span>Krish</span>
+              <span className="avatar">{initials}</span>
+              <span>{user?.displayName ?? user?.email ?? "ForeSee user"}</span>
             </a>
+            <button className="theme-switch-btn" onClick={signOut} aria-label="Sign out" title="Sign out">
+              <LogOut size={16} />
+            </button>
           </div>
         </header>
         {children}
@@ -58,4 +70,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-

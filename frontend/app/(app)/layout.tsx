@@ -1,5 +1,10 @@
+import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/layout/AppShell";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  return <AppShell>{children}</AppShell>;
+  return (
+    <AuthGate>
+      <AppShell>{children}</AppShell>
+    </AuthGate>
+  );
 }

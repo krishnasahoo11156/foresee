@@ -1,7 +1,31 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Eye } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { signInWithGoogle } = useAuth();
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      await signInWithGoogle();
+      router.push("/dashboard");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Google sign-in failed.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <main className="auth-page">
       <section className="card auth-card stack" style={{ padding: "40px" }}>
@@ -10,7 +34,7 @@ export default function LoginPage() {
             <Eye size={20} />
           </span>
           <span className="pill" style={{ fontSize: "11px" }}>
-            Mock Auth Mode
+            Firebase Auth
           </span>
         </div>
         
@@ -20,18 +44,29 @@ export default function LoginPage() {
           </p>
           <h1 style={{ fontSize: "26px", margin: "0 0 12px" }}>Sign in to your deadline cockpit.</h1>
           <p className="lead" style={{ fontSize: "14.5px", lineHeight: "1.5" }}>
-            This frontend demo uses mock data. Firebase Auth and Google OAuth will plug into this exact flow later.
+            Continue with your real Google account using Firebase Authentication.
           </p>
         </div>
 
         <div className="stack" style={{ gap: "12px", marginTop: "12px" }}>
-          <Link className="button button-primary" href="/dashboard" style={{ width: "100%", height: "42px" }}>
-            Continue with Google
-          </Link>
+          <button
+            className="button button-primary"
+            disabled={loading}
+            onClick={handleGoogleSignIn}
+            style={{ width: "100%", height: "42px", opacity: loading ? 0.72 : 1 }}
+          >
+            {loading ? "Opening Google..." : "Continue with Google"}
+          </button>
           <Link className="button button-secondary" href="/onboarding" style={{ width: "100%", height: "42px" }}>
-            Create Demo Profile
+            Complete onboarding
           </Link>
         </div>
+
+        {error ? (
+          <p className="muted" style={{ color: "var(--danger)", fontSize: "12px" }}>
+            {error}
+          </p>
+        ) : null}
 
         <div style={{ textAlign: "center", marginTop: "16px" }}>
           <Link href="/" className="muted" style={{ fontSize: "12.5px", textDecoration: "underline" }}>

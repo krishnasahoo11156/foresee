@@ -1,45 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Chrome, Lock, CheckCircle, Clock, Briefcase, ArrowRight, User, Sun, Moon } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { user, signInWithGoogle, saveUserProfile } = useAuth();
   const { theme, setTheme } = useTheme();
   const [step, setStep] = useState(1);
-  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(Boolean(user));
   const [googleConnecting, setGoogleConnecting] = useState(false);
+  const [authError, setAuthError] = useState("");
   
   // Form State
-  const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
+  const [name, setName] = useState(user?.displayName ?? "");
+  const [username, setUsername] = useState(user?.email?.split("@")[0] ?? "");
   const [password, setPassword] = useState("");
   const [profession, setProfession] = useState("developer");
   const [workStart, setWorkStart] = useState("09:00");
   const [workEnd, setWorkEnd] = useState("18:00");
   const [deepWorkHours, setDeepWorkHours] = useState("4");
 
-  const handleGoogleConnect = () => {
-    setGoogleConnecting(true);
-    setTimeout(() => {
+  useEffect(() => {
+    if (user) {
       setGoogleConnected(true);
+      setName(user.displayName ?? "");
+      setUsername(user.email?.split("@")[0] ?? "");
+    }
+  }, [user]);
+
+  const handleGoogleConnect = async () => {
+    setAuthError("");
+    setGoogleConnecting(true);
+    try {
+      const signedInUser = await signInWithGoogle();
+      setGoogleConnected(true);
+      setName(signedInUser.displayName ?? "");
+      setUsername(signedInUser.email?.split("@")[0] ?? "");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Google sign-in failed.";
+      setAuthError(message);
+    } finally {
       setGoogleConnecting(false);
-      setName("Krish Sahoo");
-      setUsername("krishsahoo");
-    }, 1200);
+    }
   };
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !username || !password) return;
+    if (!googleConnected && (!name || !username || !password)) return;
     setStep(2);
   };
 
   const handleStep2Submit = (e: React.FormEvent) => {
     e.preventDefault();
+    saveUserProfile({
+      profession,
+      workStart,
+      workEnd,
+      deepWorkHours,
+      theme
+    }).catch((error) => {
+      console.warn("Failed to save user profile preferences to database:", error);
+    });
     router.push("/dashboard");
   };
 
@@ -92,6 +118,12 @@ export default function OnboardingPage() {
                   {googleConnecting ? "Connecting..." : googleConnected ? "Google Connected ✓" : "Sign in with Google"}
                 </button>
 
+                {authError && (
+                  <p className="muted" style={{ color: "var(--danger)" }}>
+                    {authError}
+                  </p>
+                )}
+
                 {googleConnected && (
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--success)", fontSize: "13px", fontWeight: 500 }}>
                     <CheckCircle size={16} />
@@ -132,7 +164,7 @@ export default function OnboardingPage() {
                 <label className="label">
                   <span>Password</span>
                   <input
-                    required
+                    required={!googleConnected}
                     type="password"
                     className="input"
                     placeholder="••••••••"
