@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { LogOut, Search, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { Brand, Sidebar } from "@/components/layout/Sidebar";
@@ -55,7 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
             </button>
-            <a className="button button-secondary" href="/tasks">New task</a>
+            <Link className="button button-secondary" href="/tasks?new=true">New task</Link>
             <a className="user-chip" href="/profile" aria-label="Open profile">
               <span className="avatar">{initials}</span>
               <span>{user?.displayName ?? user?.email ?? "ForeSee user"}</span>

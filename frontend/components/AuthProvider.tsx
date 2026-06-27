@@ -7,7 +7,7 @@ import {
   signInWithRedirect,
   signOut as firebaseSignOut
 } from "firebase/auth";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, serverTimestamp, setDoc, onSnapshot } from "firebase/firestore";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { auth, db, googleProvider, initAnalytics } from "@/lib/firebase";
 
@@ -24,6 +24,7 @@ type ProfilePayload = {
 
 type AuthContextValue = {
   user: User | null;
+  profile: any;
   loading: boolean;
   signInWithGoogle: () => Promise<User>;
   signOut: () => Promise<void>;
@@ -34,14 +35,43 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     initAnalytics().catch(() => null);
-    return onAuthStateChanged(auth, (nextUser) => {
+    let unsubProfile: (() => void) | null = null;
+
+    const unsubAuth = onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
-      setLoading(false);
+      
+      if (unsubProfile) {
+        unsubProfile();
+        unsubProfile = null;
+      }
+
+      if (nextUser) {
+        unsubProfile = onSnapshot(doc(db, "users", nextUser.uid), (docSnap) => {
+          if (docSnap.exists()) {
+            setProfile(docSnap.data());
+          } else {
+            setProfile(null);
+          }
+          setLoading(false);
+        }, (err) => {
+          console.warn("Profile fetch failed:", err);
+          setLoading(false);
+        });
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
     });
+
+    return () => {
+      unsubAuth();
+      if (unsubProfile) unsubProfile();
+    };
   }, []);
 
   const saveUserProfile = useCallback(async (payload: ProfilePayload = {}) => {
@@ -106,12 +136,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      profile,
       loading,
       signInWithGoogle,
       signOut: () => firebaseSignOut(auth),
       saveUserProfile
     }),
-    [user, loading, signInWithGoogle, saveUserProfile]
+    [user, profile, loading, signInWithGoogle, saveUserProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
