@@ -19,22 +19,37 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <Brand />
-      {navSections.map((section) => (
-        <nav className="nav-group" key={section.label} aria-label={section.label}>
-          <div className="nav-label">{section.label}</div>
-          {section.items.map((item) => {
-            const Icon = item.icon;
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            return (
-              <Link className={`nav-item ${active ? "active" : ""}`} href={item.href} key={item.href}>
-                <Icon size={18} />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      ))}
+      <div>
+        <Brand />
+        {navSections.map((section) => (
+          <nav className="nav-group" key={section.label} aria-label={section.label}>
+            <div className="nav-label">{section.label}</div>
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <Link className={`nav-item ${active ? "active" : ""}`} href={item.href} key={item.href}>
+                  <Icon size={17} />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        ))}
+      </div>
+      <div 
+        className="sketch-note" 
+        style={{ 
+          fontSize: "0.85rem", 
+          padding: "6px 10px", 
+          marginTop: "24px", 
+          textAlign: "center",
+          display: "block",
+          transform: "rotate(-1deg)" 
+        }}
+      >
+        🎨 Dev + Artist Duality
+      </div>
     </aside>
   );
 }
