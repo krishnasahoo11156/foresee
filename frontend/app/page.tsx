@@ -36,14 +36,34 @@ export default function LandingPage() {
 
       <section className="hero-inner">
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          <p className="eyebrow">
-            <span>AI-powered deadline rescue</span>
-          </p>
-          <h1 style={{ margin: 0, fontSize: "clamp(32px, 4.5vw, 48px)" }}>See deadline trouble before it becomes panic.</h1>
+          <div>
+            <p className="eyebrow" style={{ marginBottom: "6px" }}>ForeSee 4C App</p>
+            <h1 style={{ margin: 0, fontSize: "clamp(30px, 4.2vw, 44px)" }}>See deadline trouble before it becomes panic.</h1>
+          </div>
           <p className="lead" style={{ margin: 0 }}>
             ForeSee turns tasks, calendars, behavior patterns, and agentic planning into a calm control room for finishing important work on time.
           </p>
-          <div className="btn-row" style={{ marginTop: "8px" }}>
+
+          <div className="grid grid-2" style={{ gap: "16px", marginTop: "8px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <strong style={{ fontSize: "14px", color: "var(--accent)" }}>1. Calendar Sync</strong>
+              <p className="muted" style={{ margin: 0, fontSize: "12.5px", lineHeight: "1.4" }}>Integrates Google Calendar focus slots and due dates automatically.</p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <strong style={{ fontSize: "14px", color: "var(--accent-2)" }}>2. Conflict Solver</strong>
+              <p className="muted" style={{ margin: 0, fontSize: "12.5px", lineHeight: "1.4" }}>Resolves timeline conflicts and shifts tasks asynchronously.</p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <strong style={{ fontSize: "14px", color: "var(--warning)" }}>3. Capacity Balancer</strong>
+              <p className="muted" style={{ margin: 0, fontSize: "12.5px", lineHeight: "1.4" }}>Tracks daily capacity and keeps your focus rhythm healthy.</p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              <strong style={{ fontSize: "14px", color: "var(--accent)" }}>4. Cognitive Profile</strong>
+              <p className="muted" style={{ margin: 0, fontSize: "12.5px", lineHeight: "1.4" }}>Learns daily productivity curves to suggest optimal times.</p>
+            </div>
+          </div>
+
+          <div className="btn-row" style={{ marginTop: "12px" }}>
             <Link className="button button-primary" href="/dashboard">
               View Dashboard <ArrowRight size={16} />
             </Link>
