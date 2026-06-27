@@ -37,8 +37,25 @@ export async function createGoogleCalendarEvent(
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Google Calendar API Error: ${response.status} - ${errorText}`);
+    const errorJson = await response.json().catch(() => null);
+    let activationUrl = "";
+
+    // Extract Google Console activation URL from details if API is disabled
+    if (errorJson?.error?.details) {
+      for (const detail of errorJson.error.details) {
+        if (detail.metadata?.activationUrl) {
+          activationUrl = detail.metadata.activationUrl;
+          break;
+        }
+      }
+    }
+
+    const errMsg = errorJson?.error?.message || `Google Calendar API Error: ${response.status}`;
+    const err = new Error(errMsg) as any;
+    err.status = response.status;
+    err.activationUrl = activationUrl;
+    err.errorDetails = errorJson;
+    throw err;
   }
 
   return response.json();
@@ -51,7 +68,7 @@ export async function createGoogleCalendarEvent(
 export async function syncEventsToGoogleCalendar(
   userId: string,
   events: GoogleCalendarEvent[]
-): Promise<{ success: boolean; count: number; error?: string }> {
+): Promise<{ success: boolean; count: number; error?: string; activationUrl?: string }> {
   const token = localStorage.getItem(`google_calendar_token_${userId}`);
   if (!token) {
     return {
@@ -68,12 +85,22 @@ export async function syncEventsToGoogleCalendar(
       syncedCount++;
     } catch (err: any) {
       console.error("Failed to sync event:", event, err);
-      // Remove token if expired
+
+      // Handle service disabled (403 with activationUrl)
+      if (err.status === 403 && err.activationUrl) {
+        return {
+          success: false,
+          count: syncedCount,
+          error: err.message,
+          activationUrl: err.activationUrl
+        };
+      }
+
+      // Remove token if actual auth error (401 or general invalid credentials)
       if (
-        err.message.includes("401") ||
+        err.status === 401 ||
         err.message.includes("unauthorized") ||
-        err.message.includes("Invalid Credentials") ||
-        err.message.includes("403")
+        err.message.includes("Invalid Credentials")
       ) {
         localStorage.removeItem(`google_calendar_token_${userId}`);
         return {
@@ -82,6 +109,13 @@ export async function syncEventsToGoogleCalendar(
           error: "Credentials expired. Please re-authorize Google Calendar sync."
         };
       }
+
+      // Other general error
+      return {
+        success: false,
+        count: syncedCount,
+        error: err.message || "Failed to synchronize event blocks."
+      };
     }
   }
 

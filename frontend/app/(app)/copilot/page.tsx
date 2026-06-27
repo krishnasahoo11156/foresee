@@ -32,6 +32,7 @@ export default function CopilotPage() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [hasCalendarToken, setHasCalendarToken] = useState(false);
+  const [apiActivationUrl, setApiActivationUrl] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to tasks
@@ -85,6 +86,7 @@ export default function CopilotPage() {
     const userMsg = inputText.trim();
     setInputText("");
     setSuccessMessage("");
+    setApiActivationUrl("");
     setMessages(prev => [...prev, { sender: "user", text: userMsg, timestamp: new Date() }]);
     setLoading(true);
 
@@ -113,6 +115,8 @@ export default function CopilotPage() {
   const handleAddEvents = async (events: ProposedEvent[]) => {
     if (!user || !events || events.length === 0) return;
     setLoading(true);
+    setSuccessMessage("");
+    setApiActivationUrl("");
 
     try {
       // 1. Sync to Google Calendar
@@ -129,7 +133,12 @@ export default function CopilotPage() {
         if (syncRes.success) {
           calendarSyncNote = ` Successfully synchronized ${syncRes.count} events to your actual Google Calendar.`;
         } else {
-          calendarSyncNote = ` Note: Calendar sync failed (${syncRes.error}).`;
+          if (syncRes.activationUrl) {
+            setApiActivationUrl(syncRes.activationUrl);
+            calendarSyncNote = " Google Calendar API is disabled in your cloud project. Activation link generated below.";
+          } else {
+            calendarSyncNote = ` Note: Calendar sync failed (${syncRes.error}).`;
+          }
           if (!localStorage.getItem(`google_calendar_token_${user.uid}`)) {
             setHasCalendarToken(false);
           }
@@ -177,13 +186,15 @@ export default function CopilotPage() {
 
       setSuccessMessage(`Calendar Focus Blocks Synchronized Successfully!${calendarSyncNote}`);
       
-      // Clear proposed events in the chat log so they aren't double added
-      setMessages(prev => prev.map(m => {
-        if (m.proposedEvents === events) {
-          return { ...m, proposedEvents: [] };
-        }
-        return m;
-      }));
+      // Clear proposed events in the chat log so they aren't double added if sync succeeded
+      if (!apiActivationUrl) {
+        setMessages(prev => prev.map(m => {
+          if (m.proposedEvents === events) {
+            return { ...m, proposedEvents: [] };
+          }
+          return m;
+        }));
+      }
     } catch (err) {
       console.error("Failed to write schedule events:", err);
     } finally {
@@ -239,6 +250,40 @@ export default function CopilotPage() {
           >
             Authorize Google Calendar
           </button>
+        </div>
+      )}
+
+      {/* API Disabled Action Link */}
+      {apiActivationUrl && (
+        <div 
+          className="card card-pad stack" 
+          style={{ 
+            background: "rgba(239,68,68,0.06)", 
+            border: "1px solid rgba(239,68,68,0.18)", 
+            padding: "20px 24px", 
+            borderRadius: "12px", 
+            marginBottom: "28px",
+            gap: "12px" 
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <AlertTriangle size={20} style={{ color: "var(--danger)" }} />
+            <strong style={{ fontSize: "15.5px", color: "var(--danger)" }}>Google Calendar API Needs Activation</strong>
+          </div>
+          <p className="muted" style={{ fontSize: "13.5px", margin: 0, lineHeight: 1.45 }}>
+            The Google Calendar API is not yet activated on your Google Cloud/Firebase project. Click the button below to enable it in your Google Developer Console, wait a few moments, and retry.
+          </p>
+          <div>
+            <a 
+              href={apiActivationUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="button button-primary"
+              style={{ display: "inline-flex", background: "var(--danger)", justifyContent: "center", textDecoration: "none" }}
+            >
+              Enable Google Calendar API
+            </a>
+          </div>
         </div>
       )}
 

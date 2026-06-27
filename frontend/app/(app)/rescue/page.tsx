@@ -20,6 +20,7 @@ export default function RescuePage() {
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [actionLoading, setActionLoading] = useState(false);
   const [hasCalendarToken, setHasCalendarToken] = useState(false);
+  const [apiActivationUrl, setApiActivationUrl] = useState("");
 
   // Subscribe to tasks
   useEffect(() => {
@@ -84,6 +85,7 @@ export default function RescuePage() {
     if (!user || !activeTask || !riskDetails) return;
     setActionLoading(true);
     setSuccessMessage("");
+    setApiActivationUrl("");
 
     try {
       const chosenStrategy = strategies.find(s => s.name === selectedStrategyName) || strategies[0];
@@ -102,7 +104,12 @@ export default function RescuePage() {
         if (syncRes.success) {
           calendarSyncNote = ` Successfully synchronized ${syncRes.count} events to your Google Calendar.`;
         } else {
-          calendarSyncNote = ` Note: Google Calendar sync failed (${syncRes.error}).`;
+          if (syncRes.activationUrl) {
+            setApiActivationUrl(syncRes.activationUrl);
+            calendarSyncNote = " Google Calendar API is disabled in your cloud project. Activation link generated below.";
+          } else {
+            calendarSyncNote = ` Note: Calendar sync failed (${syncRes.error}).`;
+          }
           // If token was expired/invalid, reset token state
           if (!localStorage.getItem(`google_calendar_token_${user.uid}`)) {
             setHasCalendarToken(false);
@@ -146,7 +153,10 @@ export default function RescuePage() {
 
       // Show success
       setSuccessMessage(`Rescue Action Complete! Accepted "${chosenStrategy.name}".${calendarSyncNote}`);
-      setSelectedTaskId("");
+      
+      if (!apiActivationUrl) {
+        setSelectedTaskId("");
+      }
     } catch (err) {
       console.error("Rescue plan action failed:", err);
     } finally {
@@ -202,6 +212,40 @@ export default function RescuePage() {
           >
             Authorize Google Calendar
           </button>
+        </div>
+      )}
+
+      {/* API Disabled Action Link */}
+      {apiActivationUrl && (
+        <div 
+          className="card card-pad stack" 
+          style={{ 
+            background: "rgba(239,68,68,0.06)", 
+            border: "1px solid rgba(239,68,68,0.18)", 
+            padding: "20px 24px", 
+            borderRadius: "12px", 
+            marginBottom: "28px",
+            gap: "12px" 
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <AlertTriangle size={20} style={{ color: "var(--danger)" }} />
+            <strong style={{ fontSize: "15.5px", color: "var(--danger)" }}>Google Calendar API Needs Activation</strong>
+          </div>
+          <p className="muted" style={{ fontSize: "13.5px", margin: 0, lineHeight: 1.45 }}>
+            The Google Calendar API is not yet activated on your Google Cloud/Firebase project. Click the button below to enable it in your Google Developer Console, wait a few moments, and retry.
+          </p>
+          <div>
+            <a 
+              href={apiActivationUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="button button-primary"
+              style={{ display: "inline-flex", background: "var(--danger)", justifyContent: "center", textDecoration: "none" }}
+            >
+              Enable Google Calendar API
+            </a>
+          </div>
         </div>
       )}
 
