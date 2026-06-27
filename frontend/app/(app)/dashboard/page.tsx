@@ -11,6 +11,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { collection, query, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { metrics as mockMetrics, notifications, schedule } from "@/lib/data";
+import { calculateRiskAndClassification } from "@/lib/riskEngine";
 
 export default function DashboardPage() {
   const { theme } = useTheme();
@@ -50,36 +51,9 @@ export default function DashboardPage() {
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
     });
 
-    const now = new Date();
-
-    return sorted.map((task, idx) => {
+    return sorted.map((task) => {
+      const analysis = calculateRiskAndClassification(task, tasks, profile);
       const deadline = new Date(task.deadline);
-      const diffMs = deadline.getTime() - now.getTime();
-      const daysRemaining = Math.max(0.1, diffMs / (1000 * 60 * 60 * 24));
-      const totalCapacity = daysRemaining * capacity;
-
-      let allocatedHours = 0;
-      for (let i = 0; i <= idx; i++) {
-        allocatedHours += Number(sorted[i].hours || 0);
-      }
-
-      const buffer = totalCapacity - allocatedHours;
-
-      let riskLevel: "critical" | "danger" | "monitor" | "safe" = "safe";
-      let riskPercentage = 15;
-
-      if (buffer < 0) {
-        riskLevel = "critical";
-        const ratio = totalCapacity > 0 ? allocatedHours / totalCapacity : 2;
-        riskPercentage = Math.min(99, Math.round(80 + (ratio - 1) * 20));
-      } else if (buffer <= 1.5) {
-        riskLevel = "monitor";
-        riskPercentage = Math.round(55 + (1.5 - buffer) * 15);
-      } else {
-        riskLevel = "safe";
-        riskPercentage = Math.max(5, Math.round(35 - (buffer - 1.5) * 5));
-      }
-
       const formattedDeadline = deadline.toLocaleString(undefined, {
         month: "short",
         day: "numeric",
@@ -89,12 +63,13 @@ export default function DashboardPage() {
 
       return {
         ...task,
+        hours: task.estimatedHours || task.hours || 2,
         deadline: formattedDeadline,
-        risk: riskPercentage,
-        riskLevel,
+        risk: analysis.riskScore,
+        riskLevel: analysis.riskLevel,
         progress: task.progress || 0,
-        effort: `${task.hours || 0}h needed`,
-        category: task.difficulty ? task.difficulty.toUpperCase() : "MEDIUM"
+        effort: `${task.estimatedHours || task.hours || 0}h needed`,
+        category: task.category ? task.category.toUpperCase() : "CODING"
       };
     });
   };

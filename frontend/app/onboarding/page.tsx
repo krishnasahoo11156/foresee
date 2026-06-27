@@ -28,6 +28,26 @@ export default function OnboardingPage() {
   const [workEnd, setWorkEnd] = useState("18:00");
   const [deepWorkHours, setDeepWorkHours] = useState("4");
 
+  // Advanced Onboarding parameters
+  const [workingStyle, setWorkingStyle] = useState("balanced");
+  const [preferredSessionLength, setPreferredSessionLength] = useState("45");
+  const [maxDailyDeepWork, setMaxDailyDeepWork] = useState("4");
+  const [maxTotalWork, setMaxTotalWork] = useState("8");
+  const [weekendAvailability, setWeekendAvailability] = useState(false);
+  const [lunchStart, setLunchStart] = useState("13:00");
+  const [lunchEnd, setLunchEnd] = useState("14:00");
+  const [meetingHeavy, setMeetingHeavy] = useState(false);
+  const [notificationPreference, setNotificationPreference] = useState("medium");
+  const [calendarStrictness, setCalendarStrictness] = useState("75");
+  const [procrastinationLevel, setProcrastinationLevel] = useState("2");
+  const [averageSleep, setAverageSleep] = useState("7.5");
+  const [stressLevel, setStressLevel] = useState("medium");
+  const [riskTolerance, setRiskTolerance] = useState("medium");
+  const [taskSwitchingAbility, setTaskSwitchingAbility] = useState("medium");
+  const [contextSwitchingCost, setContextSwitchingCost] = useState("15");
+  const [breakFrequency, setBreakFrequency] = useState("50");
+  const [focusRecoveryTime, setFocusRecoveryTime] = useState("20");
+
   useEffect(() => {
     if (user) {
       setGoogleConnected(true);
@@ -82,6 +102,11 @@ export default function OnboardingPage() {
 
   const handleStep2Submit = (e: React.FormEvent) => {
     e.preventDefault();
+    setStep(3);
+  };
+
+  const handleStep3Submit = (e: React.FormEvent) => {
+    e.preventDefault();
     saveUserProfile({
       name,
       username,
@@ -90,6 +115,24 @@ export default function OnboardingPage() {
       workStart,
       workEnd,
       deepWorkHours,
+      workingStyle,
+      preferredSessionLength,
+      maxDailyDeepWork,
+      maxTotalWork,
+      weekendAvailability,
+      lunchStart,
+      lunchEnd,
+      meetingHeavy,
+      notificationPreference,
+      calendarStrictness,
+      procrastinationLevel,
+      averageSleep,
+      stressLevel,
+      riskTolerance,
+      taskSwitchingAbility,
+      contextSwitchingCost,
+      breakFrequency,
+      focusRecoveryTime,
       theme
     }).catch((error) => {
       console.warn("Failed to save user profile preferences to database:", error);
@@ -114,7 +157,7 @@ export default function OnboardingPage() {
               >
                 {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
               </button>
-              <span className="muted" style={{ fontWeight: 600 }}>Step {step} of 2</span>
+              <span className="muted" style={{ fontWeight: 600 }}>Step {step} of 3</span>
             </div>
           </div>
 
@@ -277,10 +320,10 @@ export default function OnboardingPage() {
                 </Link>
               </div>
             </form>
-          ) : (
+          ) : step === 2 ? (
             <form onSubmit={handleStep2Submit} className="stack" style={{ gap: "24px" }}>
               <div>
-                <h1 style={{ margin: "0 0 8px", fontSize: "28px" }}>Configure your productivity parameters.</h1>
+                <h1 style={{ margin: "0 0 8px", fontSize: "28px" }}>Schedule & Focus Profile</h1>
                 <p className="lead" style={{ fontSize: "14px" }}>
                   ForeSee uses these constraints to design your timeline and suggest rescues.
                 </p>
@@ -324,6 +367,61 @@ export default function OnboardingPage() {
                   </label>
                 </div>
 
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <label className="label">
+                    <span>Lunch start</span>
+                    <input
+                      type="time"
+                      className="input"
+                      value={lunchStart}
+                      onChange={(e) => setLunchStart(e.target.value)}
+                    />
+                  </label>
+                  <label className="label">
+                    <span>Lunch end</span>
+                    <input
+                      type="time"
+                      className="input"
+                      value={lunchEnd}
+                      onChange={(e) => setLunchEnd(e.target.value)}
+                    />
+                  </label>
+                </div>
+
+                <label className="label">
+                  <span>Working Style</span>
+                  <select
+                    className="select"
+                    value={workingStyle}
+                    onChange={(e) => setWorkingStyle(e.target.value)}
+                  >
+                    <option value="morning">Morning Person (Active 7 AM - 12 PM)</option>
+                    <option value="balanced">Balanced Focus (Peaks 9:30 AM & 2:30 PM)</option>
+                    <option value="night">Night Owl (Active 8 PM - 2 AM)</option>
+                  </select>
+                </label>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", alignItems: "center" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px" }}>
+                    <input
+                      type="checkbox"
+                      checked={weekendAvailability}
+                      onChange={(e) => setWeekendAvailability(e.target.checked)}
+                      style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                    />
+                    <span>Available on weekends</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px" }}>
+                    <input
+                      type="checkbox"
+                      checked={meetingHeavy}
+                      onChange={(e) => setMeetingHeavy(e.target.checked)}
+                      style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                    />
+                    <span>Meeting-heavy workday</span>
+                  </label>
+                </div>
+
                 <label className="label">
                   <span>Daily deep work target (Hours)</span>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -342,7 +440,180 @@ export default function OnboardingPage() {
                 </label>
               </div>
 
-              <div style={{ marginTop: "12px" }}>
+              <div style={{ marginTop: "12.5px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--muted)", marginBottom: "6px" }}>
+                  <span>Setup completion</span>
+                  <strong>66%</strong>
+                </div>
+                <div className="progress">
+                  <span style={{ width: "66%" }} />
+                </div>
+              </div>
+
+              <div className="btn-row" style={{ marginTop: "8px", display: "flex", gap: "12px" }}>
+                <button
+                  type="submit"
+                  className="button button-primary"
+                  style={{ flex: 1, height: "44px" }}
+                >
+                  Continue parameters <ArrowRight size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  onClick={() => setStep(1)}
+                  style={{ height: "44px" }}
+                >
+                  Back
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleStep3Submit} className="stack" style={{ gap: "24px" }}>
+              <div>
+                <h1 style={{ margin: "0 0 8px", fontSize: "28px" }}>Behavioral & Cognitive Profile</h1>
+                <p className="lead" style={{ fontSize: "14px" }}>
+                  These parameters feed directly into the adaptive risk calculations and check-in schedules.
+                </p>
+              </div>
+
+              <div className="stack" style={{ gap: "16px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <label className="label">
+                    <span>Procrastination Level</span>
+                    <select
+                      className="select"
+                      value={procrastinationLevel}
+                      onChange={(e) => setProcrastinationLevel(e.target.value)}
+                    >
+                      <option value="1">Level 1 (Very proactive)</option>
+                      <option value="2">Level 2 (Normal)</option>
+                      <option value="3">Level 3 (Occasional delays)</option>
+                      <option value="4">Level 4 (Procrastinator)</option>
+                      <option value="5">Level 5 (Severe procrastinator)</option>
+                    </select>
+                  </label>
+                  <label className="label">
+                    <span>Average Daily Sleep</span>
+                    <select
+                      className="select"
+                      value={averageSleep}
+                      onChange={(e) => setAverageSleep(e.target.value)}
+                    >
+                      <option value="5">Under 6 hours</option>
+                      <option value="6.5">6 - 7 hours</option>
+                      <option value="7.5">7 - 8 hours</option>
+                      <option value="8.5">8 - 9 hours</option>
+                      <option value="9.5">9+ hours</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <label className="label">
+                    <span>Max Total Work (Hours)</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="16"
+                      className="input"
+                      value={maxTotalWork}
+                      onChange={(e) => setMaxTotalWork(e.target.value)}
+                    />
+                  </label>
+                  <label className="label">
+                    <span>Preferred Session (Mins)</span>
+                    <select
+                      className="select"
+                      value={preferredSessionLength}
+                      onChange={(e) => setPreferredSessionLength(e.target.value)}
+                    >
+                      <option value="25">25 mins (Pomodoro)</option>
+                      <option value="45">45 mins (Balanced)</option>
+                      <option value="90">90 mins (Deep Sprint)</option>
+                      <option value="120">120 mins (Heavy Work)</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <label className="label">
+                    <span>Stress Level</span>
+                    <select
+                      className="select"
+                      value={stressLevel}
+                      onChange={(e) => setStressLevel(e.target.value as any)}
+                    >
+                      <option value="low">Low stress</option>
+                      <option value="medium">Medium stress</option>
+                      <option value="high">High stress / Burned out</option>
+                    </select>
+                  </label>
+                  <label className="label">
+                    <span>Risk Tolerance</span>
+                    <select
+                      className="select"
+                      value={riskTolerance}
+                      onChange={(e) => setRiskTolerance(e.target.value as any)}
+                    >
+                      <option value="low">Low (Conservative buffers)</option>
+                      <option value="medium">Medium (Moderate buffers)</option>
+                      <option value="high">High (Tight timelines)</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <label className="label">
+                    <span>Context Switch (Mins)</span>
+                    <input
+                      type="number"
+                      className="input"
+                      value={contextSwitchingCost}
+                      onChange={(e) => setContextSwitchingCost(e.target.value)}
+                    />
+                  </label>
+                  <label className="label">
+                    <span>Calendar Strictness</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <input
+                        type="range"
+                        min="10"
+                        max="100"
+                        step="5"
+                        className="input"
+                        style={{ padding: 0 }}
+                        value={calendarStrictness}
+                        onChange={(e) => setCalendarStrictness(e.target.value)}
+                      />
+                      <span style={{ fontSize: "13px", fontWeight: "600", minWidth: "35px" }}>{calendarStrictness}%</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <label className="label">
+                    <span>Break Frequency (Mins)</span>
+                    <input
+                      type="number"
+                      className="input"
+                      value={breakFrequency}
+                      onChange={(e) => setBreakFrequency(e.target.value)}
+                    />
+                  </label>
+                  <label className="label">
+                    <span>Focus Recovery (Mins)</span>
+                    <input
+                      type="number"
+                      className="input"
+                      value={focusRecoveryTime}
+                      onChange={(e) => setFocusRecoveryTime(e.target.value)}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ marginTop: "12.5px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--muted)", marginBottom: "6px" }}>
                   <span>Setup completion</span>
                   <strong>100%</strong>
@@ -352,7 +623,7 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              <div className="btn-row" style={{ marginTop: "8px", gap: "12px" }}>
+              <div className="btn-row" style={{ marginTop: "8px", display: "flex", gap: "12px" }}>
                 <button
                   type="submit"
                   className="button button-primary"
@@ -363,7 +634,7 @@ export default function OnboardingPage() {
                 <button
                   type="button"
                   className="button button-ghost"
-                  onClick={() => setStep(1)}
+                  onClick={() => setStep(2)}
                   style={{ height: "44px" }}
                 >
                   Back

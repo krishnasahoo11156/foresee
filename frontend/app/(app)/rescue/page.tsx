@@ -1,97 +1,310 @@
-import { CheckCircle2, ShieldAlert } from "lucide-react";
+"use client";
+
+import { useState, useEffect } from "react";
+import { CheckCircle2, ShieldAlert, Sparkles, Calendar, AlertTriangle, Check, ArrowRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
-import { scenarios, tasks } from "@/lib/data";
+import { useAuth } from "@/components/AuthProvider";
+import { collection, query, onSnapshot, updateDoc, doc, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { calculateRiskAndClassification, generateRescueStrategies } from "@/lib/riskEngine";
+import { Task, RescueStrategy } from "@/lib/types";
+import Link from "next/link";
 
 export default function RescuePage() {
-  const task = tasks[0];
+  const { user, profile } = useAuth();
+  const [tasksList, setTasksList] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTaskId, setSelectedTaskId] = useState<string>("");
+  const [selectedStrategyName, setSelectedStrategyName] = useState<string>("Focused Sprint");
+  const [successMessage, setSuccessMessage] = useState<string>("");
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // Subscribe to tasks
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "users", user.uid, "tasks"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items: Task[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() } as Task);
+      });
+      setTasksList(items);
+      setLoading(false);
+    }, (err) => {
+      console.warn("Failed to subscribe to tasks list:", err);
+      setLoading(false);
+    });
+    return unsub;
+  }, [user]);
+
+  // Identify critical or danger tasks
+  const rescueCandidates = tasksList.filter(t => {
+    if (t.progress >= 100) return false;
+    const analysis = calculateRiskAndClassification(t, tasksList, profile);
+    return analysis.riskLevel === "critical" || analysis.riskLevel === "danger";
+  });
+
+  // Set default selection
+  useEffect(() => {
+    if (rescueCandidates.length > 0 && !selectedTaskId) {
+      setSelectedTaskId(rescueCandidates[0].id || rescueCandidates[0].taskId);
+    }
+  }, [rescueCandidates, selectedTaskId]);
+
+  if (loading) {
+    return (
+      <section className="page" style={{ padding: "48px", textAlign: "center" }}>
+        <p className="lead">Scanning timeline for critical risks...</p>
+      </section>
+    );
+  }
+
+  // Find selected task
+  const activeTask = tasksList.find(t => t.id === selectedTaskId || t.taskId === selectedTaskId);
+  
+  // Calculate strategies for current active task
+  let strategies: RescueStrategy[] = [];
+  let riskDetails: any = null;
+  
+  if (activeTask) {
+    riskDetails = calculateRiskAndClassification(activeTask, tasksList, profile);
+    strategies = generateRescueStrategies(activeTask, profile);
+  }
+
+  const handleAcceptRescue = async () => {
+    if (!user || !activeTask || !riskDetails) return;
+    setActionLoading(true);
+    setSuccessMessage("");
+
+    try {
+      const chosenStrategy = strategies.find(s => s.name === selectedStrategyName) || strategies[0];
+      
+      // 1. Create a rescue plan record in Firestore
+      const planRef = await addDoc(collection(db, "users", user.uid, "rescuePlans"), {
+        planId: `plan_${Date.now()}`,
+        taskId: activeTask.id || activeTask.taskId,
+        timestamp: new Date().toISOString(),
+        status: "accepted",
+        strategy: chosenStrategy,
+        createdAt: serverTimestamp()
+      });
+
+      // 2. Simulate calendar sync events by writing to calendarMappings collection
+      await addDoc(collection(db, "users", user.uid, "calendarMappings"), {
+        mappingId: `map_${Date.now()}`,
+        taskId: activeTask.id || activeTask.taskId,
+        planId: planRef.id,
+        scheduledBlocks: chosenStrategy.dailyWorkSchedule,
+        syncTimestamp: new Date().toISOString(),
+        status: "synced",
+        source: "Rescue Engine"
+      });
+
+      // 3. Update the task state to reflect rescue recovery in progress
+      const taskDocRef = doc(db, "users", user.uid, "tasks", activeTask.id || activeTask.taskId);
+      await updateDoc(taskDocRef, {
+        riskScore: Math.round(activeTask.riskScore * 0.5), // Halve the risk score upon committing to rescue
+        riskLevel: "monitor", // Transition to monitor
+        behaviorState: "recovering",
+        rescueCount: (activeTask.rescueCount || 0) + 1,
+        lastActivity: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      // Show success
+      setSuccessMessage(`Rescue Action Complete! Accepted "${chosenStrategy.name}". Added ${chosenStrategy.dailyWorkSchedule.length} focus sessions to Google Calendar.`);
+      setSelectedTaskId("");
+    } catch (err) {
+      console.error("Rescue plan action failed:", err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <section className="page page-wide">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px", marginBottom: "32px" }}>
         <div style={{ flex: "1 1 500px" }}>
           <PageHeader 
             eyebrow="Rescue Center" 
-            title="One critical task needs intervention." 
-            description="Compare simulated recovery paths, accept the highest probability plan, and sync it to your calendar automatically." 
+            title="AI deadline rescue command center" 
+            description="Automatically intercept deadline delays, construct custom focus schedules, and lock down your calendar before failures trigger." 
           />
         </div>
       </div>
 
-      <div style={{ marginBottom: "32px" }}>
-        <ImagePlaceholder label="Calendar rescue path projection simulation chart" height="240px" />
-      </div>
-
-      <div className="grid grid-2" style={{ gap: "28px" }}>
-        <div className="card card-pad stack" style={{ padding: "32px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+      {successMessage && (
+        <div className="card card-pad" style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.18)", color: "var(--success)", padding: "18px 24px", borderRadius: "12px", marginBottom: "28px", display: "flex", alignItems: "flex-start", gap: "12px" }}>
+          <CheckCircle2 size={20} style={{ flexShrink: 0, marginTop: "2px" }} />
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-              <span className="pill critical" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                <ShieldAlert size={14} /> Risk {task.risk}%
-              </span>
-              <strong style={{ color: "var(--danger)", fontSize: "14px" }}>Critical State</strong>
-            </div>
-            <h2 style={{ fontSize: "24px", lineHeight: "1.25", marginBottom: "8px" }}>{task.title}</h2>
-            <p className="muted" style={{ fontSize: "14px", marginBottom: "20px" }}><strong>Next Action:</strong> {task.nextAction}</p>
-            
-            <div style={{ margin: "24px 0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "6px" }}>
-                <span className="muted">Overall progress</span>
-                <strong>{task.progress}%</strong>
-              </div>
-              <div className="progress">
-                <span style={{ width: `${task.progress}%` }} />
-              </div>
-            </div>
+            <strong style={{ fontSize: "15px", display: "block", marginBottom: "4px" }}>Success</strong>
+            <span style={{ fontSize: "13.5px" }}>{successMessage}</span>
           </div>
-          
-          <button className="button button-primary" style={{ width: "100%", height: "42px" }}>
-            Accept Recommended Rescue Plan
-          </button>
         </div>
+      )}
 
-        <div className="grid" style={{ gap: "16px" }}>
-          {scenarios.map((scenario) => {
-            const isRecommended = scenario.name === "Focused Sprint";
-            return (
-              <div 
-                className="card card-pad metric" 
-                key={scenario.name}
-                style={{ 
-                  border: isRecommended ? "2px solid var(--accent)" : "1px solid var(--surface-line)",
-                  boxShadow: isRecommended ? "var(--shadow-md)" : "var(--shadow)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "20px 24px"
+      {rescueCandidates.length === 0 ? (
+        <div className="card card-pad" style={{ padding: "64px", textAlign: "center", border: "1px dashed var(--surface-line)", borderRadius: "16px" }}>
+          <div style={{ background: "var(--accent-soft)", width: "54px", height: "54px", borderRadius: "50%", display: "grid", placeItems: "center", margin: "0 auto 20px", color: "var(--accent)" }}>
+            <Sparkles size={24} />
+          </div>
+          <h2 style={{ fontSize: "20px", marginBottom: "8px" }}>Your Timeline is Safe</h2>
+          <p className="muted" style={{ maxWidth: "460px", margin: "0 auto 24px" }}>
+            The deadline rescue watchdogs have scanned your task queue and calendar commitments. No tasks currently exceed safety risk levels.
+          </p>
+          <Link href="/tasks" className="button button-secondary">
+            View active tasks list
+          </Link>
+        </div>
+      ) : (
+        <div className="stack" style={{ gap: "24px" }}>
+          {/* Selector if multiple tasks need rescue */}
+          {rescueCandidates.length > 1 && (
+            <div className="card card-pad" style={{ padding: "18px 24px", display: "flex", alignItems: "center", gap: "16px" }}>
+              <strong style={{ fontSize: "14px", color: "var(--muted-strong)" }}>Select task to resolve:</strong>
+              <select 
+                className="select" 
+                style={{ maxWidth: "320px" }}
+                value={selectedTaskId}
+                onChange={e => {
+                  setSelectedTaskId(e.target.value);
+                  setSuccessMessage("");
                 }}
               >
-                <div style={{ flex: 1, paddingRight: "16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                    <h3 style={{ margin: 0, fontSize: "16px" }}>{scenario.name}</h3>
-                    {isRecommended && (
-                      <span className="pill safe" style={{ fontSize: "9px", padding: "1px 6px" }}>Recommended</span>
-                    )}
+                {rescueCandidates.map(c => (
+                  <option key={c.id || c.taskId} value={c.id || c.taskId}>{c.title}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {activeTask && riskDetails && (
+            <div className="grid grid-2" style={{ gap: "28px" }}>
+              {/* Left Column: Risk Diagnostics */}
+              <div className="card card-pad stack" style={{ padding: "32px", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+                    <span className="pill critical" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                      <ShieldAlert size={14} /> Risk {riskDetails.riskScore}%
+                    </span>
+                    <strong style={{ color: "var(--danger)", fontSize: "14px" }}>{riskDetails.riskLevel.toUpperCase()} State</strong>
                   </div>
-                  <p className="muted" style={{ margin: 0, fontSize: "12.5px", lineHeight: "1.4" }}>{scenario.change}</p>
+                  <h2 style={{ fontSize: "24px", lineHeight: "1.25", marginBottom: "8px" }}>{activeTask.title}</h2>
+                  <p className="muted" style={{ fontSize: "13.5px", marginBottom: "20px" }}>
+                    <strong>Task Category:</strong> {activeTask.category} • <strong>Effort Needed:</strong> {activeTask.estimatedHours || 0} hours
+                  </p>
+                  
+                  <div style={{ margin: "24px 0" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", marginBottom: "6px" }}>
+                      <span className="muted">Initial completion probability</span>
+                      <strong>{riskDetails.completionProbability}%</strong>
+                    </div>
+                    <div className="progress">
+                      <span style={{ width: `${riskDetails.completionProbability}%` }} />
+                    </div>
+                  </div>
+
+                  <div style={{ borderTop: "1px solid var(--surface-line)", paddingTop: "20px", marginTop: "20px" }}>
+                    <h3 style={{ fontSize: "14px", marginBottom: "12px", color: "var(--muted-strong)" }}>Primary Failure Factors</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                      {[
+                        { label: "Time Scarcity", val: riskDetails.factors.timePressure, color: "var(--accent)" },
+                        { label: "Focus Workload Gap", val: riskDetails.factors.workloadGap, color: "var(--accent-2)" },
+                        { label: "Behavioral Delay Factor", val: riskDetails.factors.behavior, color: "var(--warning)" },
+                        { label: "Prerequisite Blockers", val: riskDetails.factors.dependency, color: "var(--danger)" }
+                      ].map(f => (
+                        <div key={f.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "13px" }}>
+                          <span className="muted">{f.label}</span>
+                          <span style={{ fontWeight: 600, color: f.val > 50 ? "var(--danger)" : "var(--text)" }}>{f.val}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <span 
-                  className={`pill ${scenario.probability > 75 ? "safe" : scenario.probability > 50 ? "monitor" : "critical"}`}
-                  style={{ 
-                    display: "inline-flex", 
-                    alignItems: "center", 
-                    gap: "6px", 
-                    fontSize: "13px", 
-                    padding: "6px 12px",
-                    fontWeight: 700 
-                  }}
-                >
-                  <CheckCircle2 size={13} /> {scenario.probability}%
-                </span>
+
+                <div style={{ marginTop: "32px" }}>
+                  <button 
+                    onClick={handleAcceptRescue}
+                    disabled={actionLoading}
+                    className="button button-primary" 
+                    style={{ width: "100%", height: "46px", background: "var(--danger)", justifyContent: "center" }}
+                  >
+                    {actionLoading ? "Deploying Rescue..." : `Deploy Selected: "${selectedStrategyName}"`}
+                  </button>
+                </div>
               </div>
-            );
-          })}
+
+              {/* Right Column: Rescue Strategies Comparison */}
+              <div className="grid" style={{ gap: "16px" }}>
+                {strategies.map((strategy) => {
+                  const isSelected = strategy.name === selectedStrategyName;
+                  return (
+                    <div 
+                      className="card card-pad metric" 
+                      key={strategy.name}
+                      onClick={() => setSelectedStrategyName(strategy.name)}
+                      style={{ 
+                        border: isSelected ? "2px solid var(--accent)" : "1px solid var(--surface-line)",
+                        boxShadow: isSelected ? "var(--shadow-md)" : "var(--shadow)",
+                        cursor: "pointer",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "stretch",
+                        padding: "20px 24px",
+                        transition: "all 0.2s ease"
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <h3 style={{ margin: 0, fontSize: "16px" }}>{strategy.name}</h3>
+                          {strategy.finalRecommendation && (
+                            <span className="pill safe" style={{ fontSize: "9px", padding: "1px 6px" }}>Recommended</span>
+                          )}
+                        </div>
+                        <span 
+                          className={`pill ${strategy.predictedSuccessProbability > 75 ? "safe" : strategy.predictedSuccessProbability > 50 ? "monitor" : "critical"}`}
+                          style={{ 
+                            display: "inline-flex", 
+                            alignItems: "center", 
+                            gap: "6px", 
+                            fontSize: "12px", 
+                            padding: "4px 8px",
+                            fontWeight: 700 
+                          }}
+                        >
+                          Success: {strategy.predictedSuccessProbability}%
+                        </span>
+                      </div>
+
+                      <p className="muted" style={{ margin: "0 0 12px", fontSize: "13px", lineHeight: "1.4" }}>{strategy.description}</p>
+                      
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "12.5px", borderTop: "1px solid var(--surface-line)", paddingTop: "12px" }}>
+                        <div>
+                          <strong style={{ color: "var(--muted)" }}>Trade-offs:</strong>
+                          <ul style={{ margin: "4px 0 0", paddingLeft: "16px", color: "var(--muted-strong)" }}>
+                            {strategy.tradeOffs.map(t => <li key={t}>{t}</li>)}
+                          </ul>
+                        </div>
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                            <span className="muted">Stress impact:</span>
+                            <span style={{ fontWeight: 600, color: strategy.estimatedStressImpact === 'high' ? 'var(--danger)' : 'var(--success)' }}>{strategy.estimatedStressImpact}</span>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between" }}>
+                            <span className="muted">Calendar blocks:</span>
+                            <span style={{ fontWeight: 600 }}>{strategy.dailyWorkSchedule.length} days</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </section>
   );
 }

@@ -10,6 +10,7 @@ import { collection, query, onSnapshot, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { calculateRiskAndClassification } from "@/lib/riskEngine";
 
 export default function TasksPage() {
   const { user, profile } = useAuth();
@@ -27,6 +28,18 @@ export default function TasksPage() {
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("18:00");
   const [isImportant, setIsImportant] = useState(false);
+
+  // Advanced Optional parameters
+  const [category, setCategory] = useState<string>("Coding");
+  const [taskType, setTaskType] = useState<string>("fixed_deadline");
+  const [executionStyle, setExecutionStyle] = useState<string>("single_session");
+  const [energyRequirement, setEnergyRequirement] = useState<string>("medium");
+  const [interruptionTolerance, setInterruptionTolerance] = useState<string>("semi");
+  const [estimatedConfidence, setEstimatedConfidence] = useState<number>(80);
+  const [motivationLevel, setMotivationLevel] = useState<string>("neutral");
+  const [requiresInternet, setRequiresInternet] = useState<boolean>(true);
+  const [requirementsInput, setRequirementsInput] = useState<string>("laptop");
+  const [dependenciesInput, setDependenciesInput] = useState<string>("");
 
   // Sync modal state with query param
   useEffect(() => {
@@ -72,21 +85,76 @@ export default function TasksPage() {
 
     try {
       const deadlineString = `${deadlineDate}T${deadlineTime}`;
-      await addDoc(collection(db, "users", user.uid, "tasks"), {
+      
+      const requirements = requirementsInput.split(",").map(r => r.trim()).filter(Boolean);
+      const dependencies = dependenciesInput.split(",").map(d => d.trim()).filter(Boolean);
+
+      const tempTask: any = {
+        taskId: `task_${Date.now()}`,
+        userId: user.uid,
         title,
-        hours: Number(hours),
+        estimatedHours: Number(hours),
         difficulty,
         deadline: deadlineString,
         isImportant,
         progress: 0,
-        createdAt: new Date().toISOString()
-      });
+        category: category as any,
+        taskType: taskType as any,
+        executionStyle: executionStyle as any,
+        energyRequirement: energyRequirement as any,
+        interruptionTolerance: interruptionTolerance as any,
+        estimatedConfidence: Number(estimatedConfidence),
+        motivationLevel: motivationLevel as any,
+        requiresInternet,
+        requirements,
+        dependencies,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastActivity: new Date().toISOString(),
+        rescueCount: 0,
+        planStabilityIndex: 100,
+        behaviorScore: 100,
+        riskScore: 15,
+        riskLevel: "safe",
+        riskTrend: "stable"
+      };
+
+      const analysis = calculateRiskAndClassification(tempTask, tasksList, profile);
+
+      const taskDoc = {
+        ...tempTask,
+        riskScore: analysis.riskScore,
+        riskLevel: analysis.riskLevel,
+        completionProbability: analysis.completionProbability,
+        urgency: analysis.urgency,
+        importance: analysis.importance,
+        difficulty: analysis.difficulty,
+        planningState: analysis.planningState,
+        behaviorState: analysis.behaviorState,
+        calendarState: analysis.calendarState,
+        dependencyState: analysis.dependencyState,
+        progressState: analysis.progressState,
+        factors: analysis.factors
+      };
+
+      await addDoc(collection(db, "users", user.uid, "tasks"), taskDoc);
 
       // Reset form fields
       setTitle("");
       setHours(2);
       setDifficulty("medium");
       setIsImportant(false);
+      setCategory("Coding");
+      setTaskType("fixed_deadline");
+      setExecutionStyle("single_session");
+      setEnergyRequirement("medium");
+      setInterruptionTolerance("semi");
+      setEstimatedConfidence(80);
+      setMotivationLevel("neutral");
+      setRequiresInternet(true);
+      setRequirementsInput("laptop");
+      setDependenciesInput("");
+      
       closeModal();
     } catch (err) {
       console.error("Failed to add task:", err);
@@ -95,42 +163,15 @@ export default function TasksPage() {
 
   const dailyCapacity = Number(profile?.preferences?.deepWorkHours || 4);
 
-  // Dynamic capacity risk calculations
+  // Dynamic capacity risk calculations utilizing the core math engine
   const getSortedTasksWithRisk = (tasks: any[], capacity: number) => {
     const sorted = [...tasks].sort((a, b) => {
       return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
     });
 
-    const now = new Date();
-
-    return sorted.map((task, idx) => {
+    return sorted.map((task) => {
+      const analysis = calculateRiskAndClassification(task, tasks, profile);
       const deadline = new Date(task.deadline);
-      const diffMs = deadline.getTime() - now.getTime();
-      const daysRemaining = Math.max(0.1, diffMs / (1000 * 60 * 60 * 24));
-      const totalCapacity = daysRemaining * capacity;
-
-      let allocatedHours = 0;
-      for (let i = 0; i <= idx; i++) {
-        allocatedHours += Number(sorted[i].hours || 0);
-      }
-
-      const buffer = totalCapacity - allocatedHours;
-
-      let riskLevel: "critical" | "danger" | "monitor" | "safe" = "safe";
-      let riskPercentage = 15;
-
-      if (buffer < 0) {
-        riskLevel = "critical";
-        const ratio = totalCapacity > 0 ? allocatedHours / totalCapacity : 2;
-        riskPercentage = Math.min(99, Math.round(80 + (ratio - 1) * 20));
-      } else if (buffer <= 1.5) {
-        riskLevel = "monitor";
-        riskPercentage = Math.round(55 + (1.5 - buffer) * 15);
-      } else {
-        riskLevel = "safe";
-        riskPercentage = Math.max(5, Math.round(35 - (buffer - 1.5) * 5));
-      }
-
       const formattedDeadline = deadline.toLocaleString(undefined, {
         month: "short",
         day: "numeric",
@@ -140,12 +181,13 @@ export default function TasksPage() {
 
       return {
         ...task,
+        hours: task.estimatedHours || task.hours || 2,
         deadline: formattedDeadline,
-        risk: riskPercentage,
-        riskLevel,
+        risk: analysis.riskScore,
+        riskLevel: analysis.riskLevel,
         progress: task.progress || 0,
-        effort: `${task.hours || 0}h needed`,
-        category: task.difficulty ? task.difficulty.toUpperCase() : "MEDIUM"
+        effort: `${task.estimatedHours || task.hours || 0}h needed`,
+        category: task.category ? task.category.toUpperCase() : "CODING"
       };
     });
   };
@@ -256,13 +298,15 @@ export default function TasksPage() {
           padding: "16px"
         }}>
           <div className="card" style={{
-            maxWidth: "480px",
+            maxWidth: "520px",
             width: "100%",
             padding: "28px",
             background: "var(--bg)",
             border: "1px solid var(--surface-line)",
             borderRadius: "12px",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.25)"
+            boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+            maxHeight: "85vh",
+            overflowY: "auto"
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <h2 style={{ margin: 0, fontSize: "20px" }}>Add new task</h2>
@@ -337,7 +381,101 @@ export default function TasksPage() {
                 </label>
               </div>
 
-              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", margin: "8px 0" }}>
+              {/* Advanced Parameters Section */}
+              <div style={{ padding: "12px", border: "1px solid var(--surface-line)", borderRadius: "8px", background: "var(--surface-soft)", display: "flex", flexDirection: "column", gap: "12px" }}>
+                <strong style={{ fontSize: "12px", color: "var(--accent)" }}>Productivity Engine Mapping</strong>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <label className="label">
+                    <span>Task Category</span>
+                    <select className="select" value={category} onChange={e => setCategory(e.target.value)}>
+                      <option value="Coding">Coding</option>
+                      <option value="Research">Research</option>
+                      <option value="Assignment">Assignment</option>
+                      <option value="Exam">Exam</option>
+                      <option value="Meeting">Meeting</option>
+                      <option value="Bills">Bills</option>
+                      <option value="Health">Health</option>
+                      <option value="Personal">Personal</option>
+                    </select>
+                  </label>
+                  <label className="label">
+                    <span>Task Type</span>
+                    <select className="select" value={taskType} onChange={e => setTaskType(e.target.value)}>
+                      <option value="fixed_deadline">Fixed Deadline</option>
+                      <option value="flexible">Flexible</option>
+                      <option value="recurring">Recurring</option>
+                      <option value="milestone">Milestone</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <label className="label">
+                    <span>Energy level</span>
+                    <select className="select" value={energyRequirement} onChange={e => setEnergyRequirement(e.target.value)}>
+                      <option value="very_low">Very Low</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="peak">Peak Focus</option>
+                    </select>
+                  </label>
+                  <label className="label">
+                    <span>Interruption tolerance</span>
+                    <select className="select" value={interruptionTolerance} onChange={e => setInterruptionTolerance(e.target.value)}>
+                      <option value="interruptible">Interruptible</option>
+                      <option value="semi">Semi-Interruptible</option>
+                      <option value="deep_work_only">Deep Work Only</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <label className="label">
+                    <span>Estimated Confidence</span>
+                    <select className="select" value={estimatedConfidence} onChange={e => setEstimatedConfidence(Number(e.target.value))}>
+                      <option value="20">20% (Unsure)</option>
+                      <option value="50">50% (Moderate)</option>
+                      <option value="80">80% (Highly Confident)</option>
+                      <option value="100">100% (Certain)</option>
+                    </select>
+                  </label>
+                  <label className="label">
+                    <span>Motivation Level</span>
+                    <select className="select" value={motivationLevel} onChange={e => setMotivationLevel(e.target.value)}>
+                      <option value="excited">Very Excited</option>
+                      <option value="neutral">Neutral</option>
+                      <option value="avoiding">Avoiding / Procrastinating</option>
+                      <option value="burned_out">Burned Out</option>
+                      <option value="forced">Forced</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <label className="label">
+                    <span>Requirements</span>
+                    <input type="text" className="input" placeholder="e.g. laptop, internet" value={requirementsInput} onChange={e => setRequirementsInput(e.target.value)} />
+                  </label>
+                  <label className="label">
+                    <span>Dependencies (Task IDs)</span>
+                    <input type="text" className="input" placeholder="e.g. task_123, task_456" value={dependenciesInput} onChange={e => setDependenciesInput(e.target.value)} />
+                  </label>
+                </div>
+
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginTop: "4px" }}>
+                  <input 
+                    type="checkbox" 
+                    checked={requiresInternet}
+                    onChange={e => setRequiresInternet(e.target.checked)}
+                    style={{ width: "16px", height: "16px" }}
+                  />
+                  <span style={{ fontSize: "13px" }}>Requires active internet connection</span>
+                </label>
+              </div>
+
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", margin: "4px 0" }}>
                 <input 
                   type="checkbox" 
                   checked={isImportant}

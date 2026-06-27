@@ -20,6 +20,24 @@ type ProfilePayload = {
   workEnd?: string;
   deepWorkHours?: string;
   theme?: string;
+  workingStyle?: string;
+  preferredSessionLength?: string;
+  maxDailyDeepWork?: string;
+  maxTotalWork?: string;
+  weekendAvailability?: boolean;
+  lunchStart?: string;
+  lunchEnd?: string;
+  meetingHeavy?: boolean;
+  notificationPreference?: string;
+  calendarStrictness?: string;
+  procrastinationLevel?: string;
+  averageSleep?: string;
+  stressLevel?: string;
+  riskTolerance?: string;
+  taskSwitchingAbility?: string;
+  contextSwitchingCost?: string;
+  breakFrequency?: string;
+  focusRecoveryTime?: string;
 };
 
 type AuthContextValue = {
@@ -105,11 +123,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (payload.profession !== undefined) preferences.profession = payload.profession;
     if (payload.workStart !== undefined) preferences.workStart = payload.workStart;
     if (payload.workEnd !== undefined) preferences.workEnd = payload.workEnd;
-    if (payload.deepWorkHours !== undefined) preferences.deepWorkHours = payload.deepWorkHours;
+    if (payload.deepWorkHours !== undefined) preferences.deepWorkHours = Number(payload.deepWorkHours);
     if (payload.theme !== undefined) preferences.theme = payload.theme;
+    if (payload.workingStyle !== undefined) preferences.workingStyle = payload.workingStyle;
+    if (payload.preferredSessionLength !== undefined) preferences.preferredSessionLength = Number(payload.preferredSessionLength);
+    if (payload.maxDailyDeepWork !== undefined) preferences.maxDailyDeepWork = Number(payload.maxDailyDeepWork);
+    if (payload.maxTotalWork !== undefined) preferences.maxTotalWork = Number(payload.maxTotalWork);
+    if (payload.weekendAvailability !== undefined) preferences.weekendAvailability = payload.weekendAvailability;
+    if (payload.lunchStart !== undefined) preferences.lunchStart = payload.lunchStart;
+    if (payload.lunchEnd !== undefined) preferences.lunchEnd = payload.lunchEnd;
+    if (payload.meetingHeavy !== undefined) preferences.meetingHeavy = payload.meetingHeavy;
+    if (payload.notificationPreference !== undefined) preferences.notificationPreference = payload.notificationPreference;
+    if (payload.calendarStrictness !== undefined) preferences.calendarStrictness = Number(payload.calendarStrictness);
+    if (payload.procrastinationLevel !== undefined) preferences.procrastinationLevel = Number(payload.procrastinationLevel);
+    if (payload.averageSleep !== undefined) preferences.averageSleep = Number(payload.averageSleep);
+    if (payload.stressLevel !== undefined) preferences.stressLevel = payload.stressLevel;
+    if (payload.riskTolerance !== undefined) preferences.riskTolerance = payload.riskTolerance;
+    if (payload.taskSwitchingAbility !== undefined) preferences.taskSwitchingAbility = payload.taskSwitchingAbility;
+    if (payload.contextSwitchingCost !== undefined) preferences.contextSwitchingCost = Number(payload.contextSwitchingCost);
+    if (payload.breakFrequency !== undefined) preferences.breakFrequency = Number(payload.breakFrequency);
+    if (payload.focusRecoveryTime !== undefined) preferences.focusRecoveryTime = Number(payload.focusRecoveryTime);
 
     if (Object.keys(preferences).length > 0) {
       dataToSave.preferences = preferences;
+      // Initialize matching metrics
+      dataToSave.metrics = {
+        averageCompletionRate: 0.85,
+        averageDelayHours: 0.5,
+        deepWorkCapacity: Number(payload.deepWorkHours || 4),
+        burnoutScore: 15,
+        reliabilityScore: 88,
+        focusScore: 82,
+        planningAccuracy: 0.90
+      };
     }
 
     await setDoc(
