@@ -77,18 +77,36 @@ export default function LoginPage() {
       return;
     }
 
-    if (storedPassword && password !== storedPassword) {
-      setError("Incorrect password. Please try again.");
-      setPassword(""); // Clear field for security
-      return;
+    if (storedPassword) {
+      if (password !== storedPassword) {
+        setError("Incorrect password. Please try again.");
+        setPassword(""); // Clear field for security
+        return;
+      }
+      
+      // Save name/username updates if needed
+      saveUserProfile({
+        name,
+        username
+      }).catch((err) => {
+        console.warn("Profile sync during login failed:", err);
+      });
+    } else {
+      // Register this password in the database for future logins
+      if (!password) {
+        setError("Please enter a password to secure your account.");
+        return;
+      }
+      
+      saveUserProfile({
+        name,
+        username,
+        password
+      }).catch((err) => {
+        console.warn("Profile sync during login failed:", err);
+      });
     }
 
-    saveUserProfile({
-      name,
-      username
-    }).catch((err) => {
-      console.warn("Profile sync during login failed:", err);
-    });
     router.push("/dashboard");
   };
 

@@ -51,7 +51,20 @@ export default function OnboardingPage() {
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!googleConnected && (!name || !username || !password)) return;
+    if (!googleConnected) {
+      setAuthError("Please connect your Google account first.");
+      return;
+    }
+    if (!name || !username || !password) return;
+
+    saveUserProfile({
+      name,
+      username,
+      password
+    }).catch((error) => {
+      console.warn("Failed to save credentials in step 1:", error);
+    });
+
     setStep(2);
   };
 
