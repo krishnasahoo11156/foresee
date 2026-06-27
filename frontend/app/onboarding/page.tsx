@@ -197,6 +197,13 @@ export default function OnboardingPage() {
               >
                 Continue Setup <ArrowRight size={16} />
               </button>
+              
+              <div style={{ textAlign: "center", marginTop: "16px", fontSize: "13px" }}>
+                <span className="muted">Already have an account? </span>
+                <Link href="/login" style={{ textDecoration: "underline", color: "var(--accent)", fontWeight: 500 }}>
+                  Login
+                </Link>
+              </div>
             </form>
           ) : (
             <form onSubmit={handleStep2Submit} className="stack" style={{ gap: "24px" }}>
