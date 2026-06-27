@@ -210,11 +210,14 @@ export default function LoginPage() {
         </form>
 
         <div style={{ textAlign: "center", marginTop: "8px", display: "flex", justifyContent: "space-between", fontSize: "12.5px" }}>
-          <Link href="/onboarding" className="muted" style={{ textDecoration: "underline" }}>
-            Sign up / Onboarding
-          </Link>
+          <div>
+            <span className="muted">New to the website? </span>
+            <Link href="/onboarding" style={{ textDecoration: "underline", color: "var(--accent)", fontWeight: 500 }}>
+              Sign up
+            </Link>
+          </div>
           <Link href="/" className="muted" style={{ textDecoration: "underline" }}>
-            Back to home
+            Go back to landing page
           </Link>
         </div>
       </section>

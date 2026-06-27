@@ -204,6 +204,12 @@ export default function OnboardingPage() {
                   Login
                 </Link>
               </div>
+              
+              <div style={{ textAlign: "center", marginTop: "12px", fontSize: "12.5px" }}>
+                <Link href="/" className="muted" style={{ textDecoration: "underline" }}>
+                  Go back to landing page
+                </Link>
+              </div>
             </form>
           ) : (
             <form onSubmit={handleStep2Submit} className="stack" style={{ gap: "24px" }}>
