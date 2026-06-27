@@ -1,12 +1,16 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TaskCard } from "@/components/ui/TaskCard";
-import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
+import { useTheme } from "@/components/ThemeProvider";
 import { metrics, notifications, schedule, tasks } from "@/lib/data";
 
 export default function DashboardPage() {
+  const { theme } = useTheme();
+
   return (
     <section className="page page-wide">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px", marginBottom: "32px" }}>
@@ -39,11 +43,19 @@ export default function DashboardPage() {
             {tasks.slice(0, 2).map((task) => <TaskCard task={task} key={task.id} />)}
           </div>
         </div>
-        <div style={{ display: "flex", height: "100%" }}>
-          <ImagePlaceholder 
-            label="Project productivity analysis visualization" 
-            height="100%" 
-            style={{ flex: 1, minHeight: "220px" }} 
+        <div style={{ display: "flex", height: "100%", justifyContent: "center", alignItems: "center" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={theme === "light" ? "/dashboardlight.png" : "/dashboarddark.png"} 
+            alt="Productivity Analysis Graph" 
+            style={{ 
+              maxWidth: "100%", 
+              maxHeight: "100%", 
+              height: "auto", 
+              borderRadius: "12px", 
+              objectFit: "contain",
+              transition: "opacity 0.25s ease" 
+            }} 
           />
         </div>
 
