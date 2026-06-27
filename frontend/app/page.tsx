@@ -59,7 +59,7 @@ export default function LandingPage() {
             src={theme === "light" ? "/landingpagelight.png" : "/landingpagedark.png"} 
             alt="ForeSee Product Dashboard Preview" 
             style={{ 
-              maxWidth: "100%", 
+              maxWidth: "80%", 
               height: "auto", 
               borderRadius: "12px", 
               objectFit: "contain",
