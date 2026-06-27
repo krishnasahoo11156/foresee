@@ -1,4 +1,4 @@
-﻿/* Design Tokens */
+/* Design Tokens */
 :root {
   --font-sans: var(--font-sans), "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --sidebar-w: 260px;
@@ -589,7 +589,7 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
 .onboarding-page { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; background-color: var(--bg); background-image: var(--grid-pattern); background-size: 24px 24px; position: relative; }
 .onboarding-page::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 25% 40%, var(--accent-glow) 0%, transparent 55%); pointer-events: none; }
 .onboarding-form-col { display: flex; flex-direction: column; justify-content: center; padding: 60px 52px; position: relative; z-index: 2; }
-.onboarding-visual-col { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px; border-left: 1px solid var(--glass-border); background: var(--glass-bg); backdrop-filter: blur(20px); z-index: 1; }
+.onboarding-visual-col { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px; z-index: 1; }
 
 .mobile-top { display: none; }
 
