@@ -21,15 +21,12 @@ export default function TasksPage() {
         </div>
       </div>
 
+      <div style={{ marginBottom: "32px" }}>
+        <ImagePlaceholder label="Timeline risk heat-map visualizer" height="200px" />
+      </div>
+
       <div className="grid grid-3" style={{ marginBottom: "32px", gap: "24px" }}>
-        <div className="grid grid-1" style={{ gap: "20px", gridColumn: "span 2" }}>
-          <div className="grid grid-2" style={{ gap: "20px" }}>
-            {tasks.map((task) => <TaskCard task={task} key={task.id} />)}
-          </div>
-        </div>
-        <div>
-          <ImagePlaceholder label="Timeline risk heat-map visualizer" height="236px" />
-        </div>
+        {tasks.map((task) => <TaskCard task={task} key={task.id} />)}
       </div>
 
       <div className="card card-pad" style={{ padding: "28px" }}>

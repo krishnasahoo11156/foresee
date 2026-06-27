@@ -15,15 +15,19 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="grid grid-3" style={{ gap: "32px", alignItems: "start" }}>
-        <div className="grid grid-1" style={{ gap: "24px", gridColumn: "span 2" }}>
-          <div className="card card-pad stack" style={{ padding: "28px" }}>
+      <div style={{ marginBottom: "32px" }}>
+        <ImagePlaceholder label="User profile focus statistics visualization graph" height="200px" />
+      </div>
+
+      <div className="grid grid-2" style={{ gap: "32px", alignItems: "stretch" }}>
+        <div className="card card-pad stack" style={{ padding: "28px", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--surface-line)", paddingBottom: "12px", marginBottom: "8px" }}>
               <Activity size={18} color="var(--accent)" />
               <h2 style={{ margin: 0, fontSize: "18px" }}>Work Pattern</h2>
             </div>
             
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
                 <span className="muted">Peak focus window:</span>
                 <strong style={{ color: "var(--text)" }}>9:00 AM to 11:00 AM</strong>
@@ -38,14 +42,16 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="card card-pad stack" style={{ padding: "28px" }}>
+        <div className="card card-pad stack" style={{ padding: "28px", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", borderBottom: "1px solid var(--surface-line)", paddingBottom: "12px", marginBottom: "8px" }}>
               <ToggleLeft size={18} color="var(--accent-2)" />
               <h2 style={{ margin: 0, fontSize: "18px" }}>System Preferences</h2>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
                 <span className="muted">Nudge tone style:</span>
                 <strong style={{ color: "var(--text)" }}>Direct but calm</strong>
@@ -60,10 +66,6 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        </div>
-
-        <div>
-          <ImagePlaceholder label="User profile focus statistics visualization graph" height="300px" />
         </div>
       </div>
     </section>

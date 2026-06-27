@@ -46,8 +46,8 @@ export default function PlannerPage() {
         </div>
       </div>
 
-      <div className="grid grid-3" style={{ gap: "32px", alignItems: "start" }}>
-        <div className="card card-pad stack" style={{ gridColumn: "span 2" }}>
+      <div className="grid grid-3" style={{ gap: "32px", alignItems: "stretch" }}>
+        <div className="card card-pad stack" style={{ gridColumn: "span 2", display: "flex", flexDirection: "column", height: "100%" }}>
           <h2 style={{ margin: "0 0 12px" }}>Daily schedule flow</h2>
           <div className="timeline" style={{ paddingLeft: "16px", paddingRight: "8px" }}>
             {schedule.map(([time, type, title]) => (
@@ -75,8 +75,12 @@ export default function PlannerPage() {
           </div>
         </div>
 
-        <div>
-          <ImagePlaceholder label="Google Calendar integration timeline visualizer" height="340px" />
+        <div style={{ display: "flex", height: "100%" }}>
+          <ImagePlaceholder 
+            label="Google Calendar integration timeline visualizer" 
+            height="100%" 
+            style={{ flex: 1, minHeight: "340px" }}
+          />
         </div>
       </div>
     </section>
