@@ -37,8 +37,27 @@ export default function LandingPage() {
       <section className="hero-inner">
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <div>
-            <p className="eyebrow" style={{ marginBottom: "6px" }}>ForeSee 4C App</p>
-            <h1 style={{ margin: 0, fontSize: "clamp(30px, 4.2vw, 44px)" }}>See deadline trouble before it becomes panic.</h1>
+            <h1 style={{ 
+              margin: 0, 
+              fontSize: "clamp(64px, 8vw, 96px)", 
+              fontWeight: 900, 
+              letterSpacing: "-0.04em", 
+              background: "linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%)", 
+              WebkitBackgroundClip: "text", 
+              WebkitTextFillColor: "transparent", 
+              lineHeight: 1 
+            }}>
+              4C
+            </h1>
+            <h2 style={{ 
+              margin: "12px 0 0", 
+              fontSize: "clamp(26px, 3.8vw, 40px)", 
+              fontWeight: 700, 
+              lineHeight: 1.2, 
+              color: "var(--text)" 
+            }}>
+              See deadline trouble before it becomes panic.
+            </h2>
           </div>
           <p className="lead" style={{ margin: 0 }}>
             ForeSee turns tasks, calendars, behavior patterns, and agentic planning into a calm control room for finishing important work on time.
@@ -64,11 +83,11 @@ export default function LandingPage() {
           </div>
 
           <div className="btn-row" style={{ marginTop: "12px" }}>
-            <Link className="button button-primary" href="/dashboard">
-              View Dashboard <ArrowRight size={16} />
+            <Link className="button button-primary" href="/onboarding">
+              Sign in <ArrowRight size={16} />
             </Link>
-            <Link className="button button-secondary" href="/onboarding">
-              Try Onboarding
+            <Link className="button button-secondary" href="/login">
+              Login
             </Link>
           </div>
         </div>

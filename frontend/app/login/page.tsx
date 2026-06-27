@@ -2,33 +2,64 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Eye } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Eye, Chrome, CheckCircle, ArrowRight } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signInWithGoogle } = useAuth();
+  const { user, signInWithGoogle, saveUserProfile } = useAuth();
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [googleConnecting, setGoogleConnecting] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(Boolean(user));
 
-  const handleGoogleSignIn = async () => {
+  // Form State
+  const [name, setName] = useState(user?.displayName ?? "");
+  const [username, setUsername] = useState(user?.email?.split("@")[0] ?? "");
+  const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      setGoogleConnected(true);
+      setName(user.displayName ?? "");
+      setUsername(user.email?.split("@")[0] ?? "");
+    }
+  }, [user]);
+
+  const handleGoogleConnect = async () => {
     setError("");
-    setLoading(true);
+    setGoogleConnecting(true);
     try {
-      await signInWithGoogle();
-      router.push("/dashboard");
+      const signedInUser = await signInWithGoogle();
+      setGoogleConnected(true);
+      setName(signedInUser.displayName ?? "");
+      setUsername(signedInUser.email?.split("@")[0] ?? "");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Google sign-in failed.";
       setError(message);
     } finally {
-      setLoading(false);
+      setGoogleConnecting(false);
     }
+  };
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!googleConnected) {
+      setError("Please connect your Google account first.");
+      return;
+    }
+    saveUserProfile({
+      name,
+      username
+    }).catch((err) => {
+      console.warn("Profile sync during login failed:", err);
+    });
+    router.push("/dashboard");
   };
 
   return (
     <main className="auth-page">
-      <section className="card auth-card stack" style={{ padding: "40px" }}>
+      <section className="card auth-card stack" style={{ padding: "40px", gap: "20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span className="brand-mark">
             <Eye size={20} />
@@ -38,39 +69,99 @@ export default function LoginPage() {
           </span>
         </div>
         
-        <div style={{ margin: "16px 0 8px" }}>
+        <div style={{ margin: "8px 0 0" }}>
           <p className="eyebrow" style={{ marginBottom: "6px" }}>
             Welcome to ForeSee
           </p>
           <h1 style={{ fontSize: "26px", margin: "0 0 12px" }}>Sign in to your deadline cockpit.</h1>
-          <p className="lead" style={{ fontSize: "14.5px", lineHeight: "1.5" }}>
-            Continue with your real Google account using Firebase Authentication.
+          <p className="lead" style={{ fontSize: "14px", lineHeight: "1.5" }}>
+            Connect your Google account and enter your password to authenticate.
           </p>
         </div>
 
-        <div className="stack" style={{ gap: "12px", marginTop: "12px" }}>
+        <form onSubmit={handleLoginSubmit} className="stack" style={{ gap: "20px" }}>
+          <div>
+            {!googleConnected ? (
+              <button
+                type="button"
+                className="button button-secondary"
+                disabled={googleConnecting}
+                onClick={handleGoogleConnect}
+                style={{ width: "100%", height: "44px", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}
+              >
+                <Chrome size={18} />
+                <span>{googleConnecting ? "Connecting..." : "Connect Google Account"}</span>
+              </button>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--success)", fontSize: "13px", fontWeight: 500, background: "var(--surface-soft)", padding: "10px 14px", borderRadius: "8px" }}>
+                <CheckCircle size={16} />
+                <span>Google Account connected!</span>
+              </div>
+            )}
+            {error && (
+              <p className="muted" style={{ color: "var(--danger)", fontSize: "12px", marginTop: "8px" }}>
+                {error}
+              </p>
+            )}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", width: "100%", margin: "4px 0" }}>
+            <div style={{ flex: 1, height: "1px", background: "var(--surface-line)" }}></div>
+            <span className="muted" style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Credentials</span>
+            <div style={{ flex: 1, height: "1px", background: "var(--surface-line)" }}></div>
+          </div>
+
+          <div className="stack" style={{ gap: "16px" }}>
+            <label className="label">
+              <span>Full name</span>
+              <input
+                required
+                className="input"
+                placeholder="e.g. Krish Sahoo"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+
+            <label className="label">
+              <span>Username</span>
+              <input
+                required
+                className="input"
+                placeholder="e.g. krishsahoo"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </label>
+
+            <label className="label">
+              <span>Password</span>
+              <input
+                required
+                type="password"
+                className="input"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </label>
+          </div>
+
           <button
+            type="submit"
             className="button button-primary"
-            disabled={loading}
-            onClick={handleGoogleSignIn}
-            style={{ width: "100%", height: "42px", opacity: loading ? 0.72 : 1 }}
+            style={{ width: "100%", height: "44px", marginTop: "8px" }}
           >
-            {loading ? "Opening Google..." : "Continue with Google"}
+            Log in <ArrowRight size={16} />
           </button>
-          <Link className="button button-secondary" href="/onboarding" style={{ width: "100%", height: "42px" }}>
-            Complete onboarding
+        </form>
+
+        <div style={{ textAlign: "center", marginTop: "8px", display: "flex", justifyContent: "space-between", fontSize: "12.5px" }}>
+          <Link href="/onboarding" className="muted" style={{ textDecoration: "underline" }}>
+            Sign up / Onboarding
           </Link>
-        </div>
-
-        {error ? (
-          <p className="muted" style={{ color: "var(--danger)", fontSize: "12px" }}>
-            {error}
-          </p>
-        ) : null}
-
-        <div style={{ textAlign: "center", marginTop: "16px" }}>
-          <Link href="/" className="muted" style={{ fontSize: "12.5px", textDecoration: "underline" }}>
-            Back to landing page
+          <Link href="/" className="muted" style={{ textDecoration: "underline" }}>
+            Back to home
           </Link>
         </div>
       </section>
