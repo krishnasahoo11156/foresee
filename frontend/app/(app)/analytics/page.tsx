@@ -1,12 +1,13 @@
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { metrics } from "@/lib/data";
 import { BarChart3, Info } from "lucide-react";
 
 export default function AnalyticsPage() {
   return (
-    <section className="page">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+    <section className="page page-wide">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px", marginBottom: "32px" }}>
         <div style={{ flex: "1 1 500px" }}>
           <PageHeader 
             eyebrow="Analytics" 
@@ -14,20 +15,13 @@ export default function AnalyticsPage() {
             description="Track reliability, plan stability, focus windows, and prediction error so the system learns without overwhelming the user." 
           />
         </div>
-        <div 
-          className="sketch-note" 
-          style={{ 
-            fontSize: "0.85rem", 
-            maxWidth: "340px", 
-            transform: "rotate(1.5deg)",
-            marginBottom: "24px"
-          }}
-        >
-          📈 <strong>Bias calculation:</strong> {"\"The model detected you underestimate design and copy-writing by 18%.\""}
-        </div>
       </div>
 
-      <div className="grid grid-2" style={{ gap: "20px", marginBottom: "28px" }}>
+      <div style={{ marginBottom: "32px" }}>
+        <ImagePlaceholder label="Weekly productivity metrics graph and activity line chart" height="240px" />
+      </div>
+
+      <div className="grid grid-4" style={{ gap: "20px", marginBottom: "32px" }}>
         {metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}
       </div>
 

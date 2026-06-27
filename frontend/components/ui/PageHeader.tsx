@@ -12,7 +12,7 @@ export function PageHeader({
   return (
     <div className="page-header">
       <div>
-        {eyebrow ? <p className="eyebrow"><span className="sketch-highlight">{eyebrow}</span></p> : null}
+        {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
         <h1>{title}</h1>
         {description ? <p className="lead">{description}</p> : null}
       </div>

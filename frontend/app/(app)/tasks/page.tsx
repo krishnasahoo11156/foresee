@@ -1,44 +1,43 @@
 import { Plus, TableProperties } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TaskCard } from "@/components/ui/TaskCard";
+import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
 import { tasks } from "@/lib/data";
 import Link from "next/link";
 
 export default function TasksPage() {
   return (
     <section className="page page-wide">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px", marginBottom: "32px" }}>
         <div style={{ flex: "1 1 500px" }}>
           <PageHeader
             eyebrow="Tasks"
             title="Every deadline, risk-scored."
             description="Create tasks in natural language, track subtasks, and let ForeSee keep the rescue options close."
-            action={<button className="button button-primary"><Plus size={16} /> Add task</button>}
           />
         </div>
-        <div 
-          className="sketch-note" 
-          style={{ 
-            fontSize: "0.85rem", 
-            maxWidth: "320px", 
-            transform: "rotate(1.5deg)",
-            marginBottom: "24px"
-          }}
-        >
-          ✏️ <strong>Natural Language parsing:</strong> {"\"Try writing 'Review prompt library by Mon 5pm' in the input box later.\""}
+        <div>
+          <button className="button button-primary"><Plus size={16} /> Add task</button>
         </div>
       </div>
 
-      <div className="grid grid-3" style={{ marginBottom: "32px", gap: "20px" }}>
-        {tasks.map((task) => <TaskCard task={task} key={task.id} />)}
+      <div className="grid grid-3" style={{ marginBottom: "32px", gap: "24px" }}>
+        <div className="grid grid-1" style={{ gap: "20px", gridColumn: "span 2" }}>
+          <div className="grid grid-2" style={{ gap: "20px" }}>
+            {tasks.map((task) => <TaskCard task={task} key={task.id} />)}
+          </div>
+        </div>
+        <div>
+          <ImagePlaceholder label="Timeline risk heat-map visualizer" height="236px" />
+        </div>
       </div>
 
-      <div className="card card-pad" style={{ padding: "20px 24px" }}>
+      <div className="card card-pad" style={{ padding: "28px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-          <div style={{ color: "var(--accent)" }}>
+          <div style={{ color: "var(--accent)", display: "flex" }}>
             <TableProperties size={18} />
           </div>
-          <h2 style={{ margin: 0, fontSize: "18px" }}>Detailed deadine matrix</h2>
+          <h2 style={{ margin: 0, fontSize: "18px" }}>Detailed deadline matrix</h2>
         </div>
         
         <div style={{ overflowX: "auto" }}>

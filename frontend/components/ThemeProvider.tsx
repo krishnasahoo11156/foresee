@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "light" | "dark" | "ocean";
+type Theme = "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
@@ -12,12 +12,12 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark"); // Default to dark for premium feel
+  const [theme, setThemeState] = useState<Theme>("dark");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("foresee-theme") as Theme;
-    if (savedTheme && ["light", "dark", "ocean"].includes(savedTheme)) {
+    if (savedTheme && ["light", "dark"].includes(savedTheme)) {
       setThemeState(savedTheme);
     } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
       setThemeState("light");
@@ -33,7 +33,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!mounted) return;
     const root = document.documentElement;
-    root.classList.remove("theme-light", "theme-dark", "theme-ocean");
+    root.classList.remove("theme-light", "theme-dark");
     root.classList.add(`theme-${theme}`);
   }, [theme, mounted]);
 

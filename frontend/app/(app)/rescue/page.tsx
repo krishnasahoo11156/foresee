@@ -1,12 +1,13 @@
 import { CheckCircle2, ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
 import { scenarios, tasks } from "@/lib/data";
 
 export default function RescuePage() {
   const task = tasks[0];
   return (
     <section className="page page-wide">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px", marginBottom: "32px" }}>
         <div style={{ flex: "1 1 500px" }}>
           <PageHeader 
             eyebrow="Rescue Center" 
@@ -14,17 +15,10 @@ export default function RescuePage() {
             description="Compare simulated recovery paths, accept the highest probability plan, and sync it to your calendar automatically." 
           />
         </div>
-        <div 
-          className="sketch-note" 
-          style={{ 
-            fontSize: "0.85rem", 
-            maxWidth: "340px", 
-            transform: "rotate(-1.5deg)",
-            marginBottom: "24px"
-          }}
-        >
-          💡 <strong>Agent Simulation:</strong> {"\"Focused Sprint offers +35% probability boost with minimal scope change.\""}
-        </div>
+      </div>
+
+      <div style={{ marginBottom: "32px" }}>
+        <ImagePlaceholder label="Calendar rescue path projection simulation chart" height="240px" />
       </div>
 
       <div className="grid grid-2" style={{ gap: "28px" }}>
@@ -50,7 +44,7 @@ export default function RescuePage() {
             </div>
           </div>
           
-          <button className="button button-primary" style={{ width: "100%", minHeight: "44px" }}>
+          <button className="button button-primary" style={{ width: "100%", height: "42px" }}>
             Accept Recommended Rescue Plan
           </button>
         </div>
@@ -64,7 +58,7 @@ export default function RescuePage() {
                 key={scenario.name}
                 style={{ 
                   border: isRecommended ? "2px solid var(--accent)" : "1px solid var(--surface-line)",
-                  boxShadow: isRecommended ? "var(--shadow-lg)" : "var(--shadow)",
+                  boxShadow: isRecommended ? "var(--shadow-md)" : "var(--shadow)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
