@@ -363,12 +363,11 @@ export default function OnboardingPage() {
             alt="ForeSee Onboarding illustration" 
             style={{ 
               maxWidth: "100%", 
-              maxHeight: "100%",
+              maxHeight: "360px",
               height: "auto", 
               borderRadius: "12px", 
               objectFit: "contain",
               transition: "opacity 0.25s ease",
-              paddingTop: "100px"
             }} 
           />
           <div style={{ marginTop: "24px", textAlign: "center" }}>

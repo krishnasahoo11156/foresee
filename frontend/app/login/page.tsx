@@ -125,12 +125,11 @@ export default function LoginPage() {
             alt="ForeSee Login illustration" 
             style={{ 
               maxWidth: "100%", 
-              maxHeight: "70%",
+              maxHeight: "360px",
               height: "auto", 
               borderRadius: "12px", 
               objectFit: "contain",
               transition: "opacity 0.25s ease",
-              paddingTop: "40px"
             }} 
           />
           <div style={{ marginTop: "24px", textAlign: "center" }}>
