@@ -86,7 +86,7 @@ User Active Tasks: ${tasksContext}
 Existing Calendar Mappings: ${calendarContext}`;
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${currentKey}`;
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -140,7 +140,11 @@ function generateFallbackMockResponse(message: string, tasks: Task[]): CopilotRe
   const lowercase = message.toLowerCase();
   
   // Find which task the user might be asking about
-  const matchingTask = tasks.find(t => lowercase.includes(t.title.toLowerCase()) || lowercase.includes(t.category.toLowerCase())) || tasks.find(t => t.progress < 100);
+  const matchingTask = tasks.find(t => {
+    const titleMatch = t.title ? lowercase.includes(t.title.toLowerCase()) : false;
+    const catMatch = t.category ? lowercase.includes(t.category.toLowerCase()) : false;
+    return titleMatch || catMatch;
+  }) || tasks.find(t => t.progress < 100);
 
   if (!matchingTask) {
     return {

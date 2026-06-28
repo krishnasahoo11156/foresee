@@ -11,7 +11,7 @@ import { db } from "@/lib/firebase";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, signInWithGoogle, saveUserProfile } = useAuth();
+  const { user, signInWithGoogle, saveUserProfile, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const [step, setStep] = useState(1);
   const [googleConnected, setGoogleConnected] = useState(Boolean(user));
@@ -53,6 +53,11 @@ export default function OnboardingPage() {
       setGoogleConnected(true);
       setName(user.displayName ?? "");
       setUsername(user.email?.split("@")[0] ?? "");
+    } else {
+      setGoogleConnected(false);
+      setName("");
+      setUsername("");
+      setPassword("");
     }
   }, [user]);
 
@@ -67,6 +72,7 @@ export default function OnboardingPage() {
       if (docSnap.exists() && docSnap.data().password) {
         setAuthError("You have already logged in with this account.");
         setGoogleConnected(false);
+        await signOut();
         return;
       }
 
@@ -78,6 +84,19 @@ export default function OnboardingPage() {
       setAuthError(message);
     } finally {
       setGoogleConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      await signOut();
+      setGoogleConnected(false);
+      setName("");
+      setUsername("");
+      setPassword("");
+      setAuthError("");
+    } catch (err) {
+      console.warn("Failed to disconnect Google account:", err);
     }
   };
 
@@ -224,9 +243,28 @@ export default function OnboardingPage() {
                 )}
 
                 {googleConnected && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--success)", fontSize: "13px", fontWeight: 500 }}>
-                    <CheckCircle size={16} />
-                    <span>Imported profile details successfully!</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--success)", fontSize: "13px", fontWeight: 500 }}>
+                      <CheckCircle size={16} />
+                      <span>Imported profile details successfully!</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDisconnect}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--accent)",
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        textAlign: "left",
+                        padding: 0,
+                        width: "fit-content"
+                      }}
+                    >
+                      Use a different Google account
+                    </button>
                   </div>
                 )}
               </div>
