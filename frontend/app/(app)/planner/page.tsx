@@ -246,7 +246,7 @@ export default function PlannerPage() {
       <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1.9fr", gap: "32px", alignItems: "stretch" }}>
         
         {/* Left Side: Daily Schedule Flow */}
-        <div className="card card-pad stack" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <div className="card stack" style={{ display: "flex", flexDirection: "column", height: "100%", padding: "24px 20px 24px 16px" }}>
           <h2 style={{ margin: "0 0 12px" }}>Daily schedule flow</h2>
           <div className="timeline" style={{ paddingRight: "8px" }}>
             {scheduleList.map((item) => (
