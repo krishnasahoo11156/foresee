@@ -4,10 +4,11 @@ import { Calendar, AlertTriangle, CheckCircle2, Info, ArrowRight, Clock } from "
 
 interface TimelineHeatmapProps {
   tasks: any[];
+  subtasks?: any[];
   dailyCapacity: number;
 }
 
-export function TimelineHeatmap({ tasks, dailyCapacity }: TimelineHeatmapProps) {
+export function TimelineHeatmap({ tasks, subtasks = [], dailyCapacity }: TimelineHeatmapProps) {
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
 
   // Generate 14 days of timeline data starting from today
@@ -31,14 +32,26 @@ export function TimelineHeatmap({ tasks, dailyCapacity }: TimelineHeatmapProps) 
         );
       });
 
-      const totalHours = dayTasks.reduce(
-        (sum, task) => sum + (task.estimatedHours || task.hours || 0),
-        0
-      );
+      // Filter subtasks scheduled on this specific day
+      const daySubtasks = subtasks.filter((subtask) => {
+        if (!subtask.startTime) return false;
+        const sd = new Date(subtask.startTime);
+        return (
+          sd.getFullYear() === current.getFullYear() &&
+          sd.getMonth() === current.getMonth() &&
+          sd.getDate() === current.getDate()
+        );
+      });
+
+      const totalHours = subtasks.length > 0
+        ? daySubtasks.reduce((sum, s) => sum + (s.estimatedHours || 0), 0)
+        : dayTasks.reduce((sum, task) => sum + (task.estimatedHours || task.hours || 0), 0);
 
       // Classify the day's risk level based on workload vs capacity
       let riskLevel: "safe" | "monitor" | "danger" | "empty" = "empty";
-      if (dayTasks.length > 0) {
+      const hasWork = subtasks.length > 0 ? daySubtasks.length > 0 : dayTasks.length > 0;
+      
+      if (hasWork) {
         if (totalHours <= dailyCapacity) {
           riskLevel = "safe";
         } else if (totalHours <= dailyCapacity * 1.5) {
@@ -60,12 +73,13 @@ export function TimelineHeatmap({ tasks, dailyCapacity }: TimelineHeatmapProps) 
           year: "numeric",
         }),
         tasks: dayTasks,
+        subtasks: daySubtasks,
         totalHours,
         riskLevel,
       });
     }
     return days;
-  }, [tasks, dailyCapacity]);
+  }, [tasks, subtasks, dailyCapacity]);
 
   const selectedDay = timelineDays[selectedDayIndex] || timelineDays[0];
 
@@ -292,63 +306,120 @@ export function TimelineHeatmap({ tasks, dailyCapacity }: TimelineHeatmapProps) 
         {/* Right Side: Deadline list */}
         <div>
           <h4 className="muted" style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>
-            Deadlines on this day ({selectedDay.tasks.length})
+            {subtasks.length > 0 ? `Scheduled Subtasks (${selectedDay.subtasks.length})` : `Deadlines (${selectedDay.tasks.length})`}
           </h4>
           
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "170px", overflowY: "auto", paddingRight: "4px" }}>
-            {selectedDay.tasks.length > 0 ? (
-              selectedDay.tasks.map((task) => (
-                <Link 
-                  key={task.id} 
-                  href={`/tasks/${task.id}`}
-                  className="list-row"
+            {subtasks.length > 0 ? (
+              selectedDay.subtasks.length > 0 ? (
+                selectedDay.subtasks.map((st: any) => {
+                  const parentTask = tasks.find(t => t.id === st.taskId || t.taskId === st.taskId);
+                  return (
+                    <Link 
+                      key={st.id || st.subtaskId} 
+                      href={`/tasks/${st.taskId}`}
+                      className="list-row"
+                      style={{ 
+                        padding: "10px 14px", 
+                        fontSize: "13px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        background: "var(--surface)",
+                        textDecoration: "none"
+                      }}
+                    >
+                      <div style={{ display: "flex", flexDirection: "column", gap: "2px", maxWidth: "75%" }}>
+                        <strong style={{ color: "var(--text)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                          {parentTask ? `[${parentTask.title}] - ${st.title}` : st.title}
+                        </strong>
+                        <span className="muted" style={{ fontSize: "11.5px" }}>
+                          {parentTask?.category || "Focus Block"}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span className="muted" style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "3px" }}>
+                          <Clock size={12} /> {st.estimatedHours}h
+                        </span>
+                        <ArrowRight size={14} className="muted" />
+                      </div>
+                    </Link>
+                  );
+                })
+              ) : (
+                <div 
                   style={{ 
-                    padding: "10px 14px", 
-                    fontSize: "13px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
+                    display: "flex", 
+                    flexDirection: "column", 
+                    alignItems: "center", 
+                    justifyContent: "center", 
+                    padding: "32px", 
+                    color: "var(--muted)", 
+                    border: "1px dashed var(--surface-line)", 
+                    borderRadius: "8px",
                     background: "var(--surface)",
-                    textDecoration: "none"
+                    textAlign: "center"
                   }}
                 >
-                  <div style={{ display: "flex", flexDirection: "column", gap: "2px", maxWidth: "75%" }}>
-                    <strong style={{ color: "var(--text)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                      {task.title}
-                    </strong>
-                    <span className="muted" style={{ fontSize: "11.5px" }}>
-                      {task.category}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span className="muted" style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "3px" }}>
-                      <Clock size={12} /> {task.estimatedHours || task.hours || 2}h
-                    </span>
-                    <span className={`pill ${task.riskLevel}`} style={{ padding: "1px 6px", fontSize: "10px" }}>
-                      {task.risk}%
-                    </span>
-                    <ArrowRight size={14} className="muted" />
-                  </div>
-                </Link>
-              ))
+                  <span style={{ fontSize: "20px", marginBottom: "4px" }}>🎉</span>
+                  <span style={{ fontSize: "12.5px" }}>No subtasks scheduled</span>
+                </div>
+              )
             ) : (
-              <div 
-                style={{ 
-                  display: "flex", 
-                  flexDirection: "column", 
-                  alignItems: "center", 
-                  justifyContent: "center", 
-                  padding: "32px", 
-                  color: "var(--muted)", 
-                  border: "1px dashed var(--surface-line)", 
-                  borderRadius: "8px",
-                  background: "var(--surface)",
-                  textAlign: "center"
-                }}
-              >
-                <span style={{ fontSize: "20px", marginBottom: "4px" }}>🎉</span>
-                <span style={{ fontSize: "12.5px" }}>No deadlines due today</span>
-              </div>
+              selectedDay.tasks.length > 0 ? (
+                selectedDay.tasks.map((task) => (
+                  <Link 
+                    key={task.id} 
+                    href={`/tasks/${task.id}`}
+                    className="list-row"
+                    style={{ 
+                      padding: "10px 14px", 
+                      fontSize: "13px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: "var(--surface)",
+                      textDecoration: "none"
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: "2px", maxWidth: "75%" }}>
+                      <strong style={{ color: "var(--text)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                        {task.title}
+                      </strong>
+                      <span className="muted" style={{ fontSize: "11.5px" }}>
+                        {task.category}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span className="muted" style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "3px" }}>
+                        <Clock size={12} /> {task.estimatedHours || task.hours || 2}h
+                      </span>
+                      <span className={`pill ${task.riskLevel}`} style={{ padding: "1px 6px", fontSize: "10px" }}>
+                        {task.risk}%
+                      </span>
+                      <ArrowRight size={14} className="muted" />
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div 
+                  style={{ 
+                    display: "flex", 
+                    flexDirection: "column", 
+                    alignItems: "center", 
+                    justifyContent: "center", 
+                    padding: "32px", 
+                    color: "var(--muted)", 
+                    border: "1px dashed var(--surface-line)", 
+                    borderRadius: "8px",
+                    background: "var(--surface)",
+                    textAlign: "center"
+                  }}
+                >
+                  <span style={{ fontSize: "20px", marginBottom: "4px" }}>🎉</span>
+                  <span style={{ fontSize: "12.5px" }}>No deadlines due today</span>
+                </div>
+              )
             )}
           </div>
         </div>
