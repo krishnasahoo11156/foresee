@@ -470,7 +470,7 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
             </div>
 
             <p className="muted" style={{ margin: 0, fontSize: "14.5px", lineHeight: "1.6" }}>
-              Are you sure you want to delete <strong style={{ color: "var(--text)" }}>"{originalTask.title}"</strong>?
+              Are you sure you want to delete <strong style={{ color: "var(--text)" }}>&ldquo;{originalTask.title}&rdquo;</strong>?
               This will permanently remove this task, its subtasks, and desync them from your Google Calendar. This action cannot be undone.
             </p>
 
