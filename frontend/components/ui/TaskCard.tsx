@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Clock } from "lucide-react";
 import { tasks } from "@/lib/data";
 
-type Task = (typeof tasks)[number];
+type Task = (typeof tasks)[number] & { taskId?: string };
 
 export function TaskCard({ task }: { task: Task }) {
   return (
@@ -13,7 +13,14 @@ export function TaskCard({ task }: { task: Task }) {
       </div>
       <div>
         <h3>{task.title}</h3>
-        <p className="muted">{task.category} - {task.deadline}</p>
+        <p className="muted" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", marginTop: "4px" }}>
+          <span>{task.category}</span>
+          <span>•</span>
+          <span>{task.deadline}</span>
+          <span className="pill monitor" style={{ fontSize: "9.5px", padding: "1px 6px", textTransform: "none", letterSpacing: "normal" }}>
+            ID: {task.taskId || task.id}
+          </span>
+        </p>
       </div>
       <div className="progress" aria-label={`${task.progress}% complete`}>
         <span style={{ width: `${task.progress}%` }} />

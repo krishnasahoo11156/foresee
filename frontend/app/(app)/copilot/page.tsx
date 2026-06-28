@@ -15,6 +15,7 @@ interface Message {
   text: string;
   timestamp: Date;
   proposedEvents?: ProposedEvent[];
+  eventsAdded?: boolean;
 }
 
 export default function CopilotPage() {
@@ -74,6 +75,31 @@ export default function CopilotPage() {
     return unsub;
   }, [user]);
 
+  // Load chat messages from localStorage on mount
+  useEffect(() => {
+    if (!user) return;
+    const cached = localStorage.getItem(`copilot_messages_${user.uid}`);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        // Convert timestamp strings back to Date objects
+        const formatted = parsed.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp)
+        }));
+        setMessages(formatted);
+      } catch (err) {
+        console.warn("Failed to parse cached copilot messages:", err);
+      }
+    }
+  }, [user]);
+
+  // Save chat messages to localStorage when they change
+  useEffect(() => {
+    if (!user || messages.length <= 1) return;
+    localStorage.setItem(`copilot_messages_${user.uid}`, JSON.stringify(messages));
+  }, [user, messages]);
+
   // Scroll to bottom of chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -112,21 +138,101 @@ export default function CopilotPage() {
     }
   };
 
-  const handleAddEvents = async (events: ProposedEvent[]) => {
+  const handleAddEvents = async (events: ProposedEvent[], messageIndex: number) => {
     if (!user || !events || events.length === 0) return;
     setLoading(true);
     setSuccessMessage("");
     setApiActivationUrl("");
 
     try {
-      // 1. Sync to Google Calendar
+      // 1. Check existing tasks and resolve/generate task IDs
+      const syncedBlocks = [];
+      const updatedTasks = [];
+
+      for (const event of events) {
+        const durationMs = new Date(event.endTime).getTime() - new Date(event.startTime).getTime();
+        const durationHours = Math.max(0.5, Math.round((durationMs / (1000 * 60 * 60)) * 2) / 2);
+
+        // Try to match with an existing task in tasksList by title
+        const existingTask = tasksList.find(t => 
+          event.title.toLowerCase().includes(t.title.toLowerCase()) || 
+          t.title.toLowerCase().includes(event.title.toLowerCase())
+        );
+
+        let targetTaskId = "";
+
+        if (existingTask) {
+          targetTaskId = existingTask.taskId || existingTask.id || "";
+          // Update existing task time and state in Firestore
+          const taskDocRef = doc(db, "users", user.uid, "tasks", existingTask.id || "");
+          const scheduledTimeStr = new Date(event.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          
+          await updateDoc(taskDocRef, {
+            deadline: event.endTime,
+            scheduledTime: scheduledTimeStr,
+            calendarState: "synced",
+            updatedAt: new Date().toISOString()
+          });
+
+          updatedTasks.push({ title: existingTask.title, id: targetTaskId });
+        } else {
+          // Create a new task in Firestore
+          targetTaskId = `task_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+          const scheduledTimeStr = new Date(event.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          
+          await addDoc(collection(db, "users", user.uid, "tasks"), {
+            taskId: targetTaskId,
+            userId: user.uid,
+            title: event.title,
+            estimatedHours: durationHours,
+            difficulty: "medium",
+            deadline: event.endTime,
+            isImportant: false,
+            progress: 0,
+            category: "Coding",
+            taskType: "fixed_deadline",
+            executionStyle: "single_session",
+            energyRequirement: "medium",
+            interruptionTolerance: "semi",
+            estimatedConfidence: 80,
+            motivationLevel: "neutral",
+            requiresInternet: true,
+            requirements: ["laptop"],
+            dependencies: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            lastActivity: new Date().toISOString(),
+            rescueCount: 0,
+            planStabilityIndex: 100,
+            behaviorScore: 100,
+            riskScore: 10,
+            riskLevel: "safe",
+            riskTrend: "stable",
+            calendarState: "synced",
+            scheduledTime: scheduledTimeStr
+          });
+
+          updatedTasks.push({ title: event.title, id: targetTaskId });
+        }
+
+        // Add to calendar mapping blocks with task ID injected into description
+        syncedBlocks.push({
+          title: event.title,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          description: `${event.description} [ID: ${targetTaskId}]`,
+          taskId: targetTaskId
+        });
+      }
+
+      // 2. Sync to Google Calendar (injecting task ID in event descriptions)
       let calendarSyncNote = "";
       if (hasCalendarToken) {
-        const eventsToSync = events.map(e => ({
-          summary: e.title,
-          description: e.description,
-          startTime: e.startTime,
-          endTime: e.endTime
+        const eventsToSync = syncedBlocks.map(b => ({
+          summary: b.title,
+          description: b.description,
+          startTime: b.startTime,
+          endTime: b.endTime
         }));
 
         const syncRes = await syncEventsToGoogleCalendar(user.uid, eventsToSync);
@@ -147,22 +253,17 @@ export default function CopilotPage() {
         calendarSyncNote = " Note: Google Calendar sync is offline. Authorize calendar access below.";
       }
 
-      // 2. Create a calendar mapping log in Firestore
+      // 3. Create calendar mapping document in Firestore
       await addDoc(collection(db, "users", user.uid, "calendarMappings"), {
         mappingId: `map_${Date.now()}`,
         syncTimestamp: new Date().toISOString(),
         status: "synced",
         source: "AI Copilot Scheduler",
-        scheduledBlocks: events.map(e => ({
-          title: e.title,
-          startTime: e.startTime,
-          endTime: e.endTime,
-          description: e.description
-        })),
+        scheduledBlocks: syncedBlocks,
         createdAt: serverTimestamp()
       });
 
-      // 3. Perform any task shifts in the database
+      // 4. Perform any task shifts in the database
       for (const event of events) {
         if (event.shiftRequired && event.shiftedTaskId) {
           const shiftedTask = tasksList.find(t => t.id === event.shiftedTaskId || t.taskId === event.shiftedTaskId);
@@ -186,11 +287,11 @@ export default function CopilotPage() {
 
       setSuccessMessage(`Calendar Focus Blocks Synchronized Successfully!${calendarSyncNote}`);
       
-      // Clear proposed events in the chat log so they aren't double added if sync succeeded
+      // Update state to mark this specific message as added so we preserve the proposed events list
       if (!apiActivationUrl) {
-        setMessages(prev => prev.map(m => {
-          if (m.proposedEvents === events) {
-            return { ...m, proposedEvents: [] };
+        setMessages(prev => prev.map((m, idx) => {
+          if (idx === messageIndex) {
+            return { ...m, eventsAdded: true };
           }
           return m;
         }));
@@ -212,6 +313,21 @@ export default function CopilotPage() {
     }
   };
 
+  const handleClearHistory = () => {
+    if (confirm("Are you sure you want to clear your Copilot chat history?")) {
+      setMessages([
+        {
+          sender: "copilot",
+          text: "Hello! I am your ForeSee AI Copilot. I analyze your tasks, onboarding preferences, and calendar in real-time. Ask me 'How should I complete my tasks?' or 'Plan my coding project' and I will structure a focus schedule for you.",
+          timestamp: new Date()
+        }
+      ]);
+      if (user) {
+        localStorage.removeItem(`copilot_messages_${user.uid}`);
+      }
+    }
+  };
+
   return (
     <section className="page page-wide">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px", marginBottom: "32px" }}>
@@ -221,6 +337,11 @@ export default function CopilotPage() {
             title="Ask what to do next." 
             description="ForeSee AI Copilot uses Gemini to reason about your priorities, avoid calendar conflicts, and dynamically structure focus events." 
           />
+        </div>
+        <div>
+          <button className="button button-secondary" onClick={handleClearHistory} style={{ color: "var(--danger)", borderColor: "rgba(220,38,38,0.2)" }}>
+            Clear chat history
+          </button>
         </div>
       </div>
 
@@ -344,13 +465,22 @@ export default function CopilotPage() {
                             const startStr = new Date(evt.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                             const endStr = new Date(evt.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                             const dateStr = new Date(evt.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' });
+                            
+                            // Try to match the event with an existing task ID
+                            const matchedTask = tasksList.find(t => 
+                              evt.title.toLowerCase().includes(t.title.toLowerCase()) || 
+                              t.title.toLowerCase().includes(evt.title.toLowerCase())
+                            );
+                            const taskIdToDisplay = matchedTask ? (matchedTask.taskId || matchedTask.id) : "Will generate";
+
                             return (
                               <div key={eIdx} style={{ padding: "12px", border: "1px solid var(--surface-line)", borderRadius: "8px", background: "var(--surface)" }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
                                   <strong style={{ fontSize: "13.5px" }}>{evt.title}</strong>
                                   <span className="pill safe" style={{ fontSize: "9px" }}>{dateStr}</span>
                                 </div>
-                                <span className="muted" style={{ fontSize: "12px", display: "block", marginBottom: "6px" }}>Time Slot: {startStr} - {endStr}</span>
+                                <span className="muted" style={{ fontSize: "12px", display: "block", marginBottom: "4px" }}>Time Slot: {startStr} - {endStr}</span>
+                                <span className="pill monitor" style={{ fontSize: "9px", display: "inline-block", marginBottom: "8px" }}>ID: {taskIdToDisplay}</span>
                                 <p className="muted" style={{ fontSize: "12.5px", margin: 0 }}>{evt.description}</p>
                                 
                                 {evt.shiftRequired && (
@@ -364,7 +494,25 @@ export default function CopilotPage() {
                           })}
                         </div>
 
-                        {!hasCalendarToken ? (
+                        {msg.eventsAdded ? (
+                          <div 
+                            style={{ 
+                              display: "flex", 
+                              alignItems: "center", 
+                              justifyContent: "center", 
+                              gap: "8px", 
+                              height: "38px", 
+                              fontSize: "13px", 
+                              fontWeight: 600,
+                              color: "var(--success)",
+                              background: "rgba(34, 197, 94, 0.08)",
+                              border: "1px solid rgba(34, 197, 94, 0.18)",
+                              borderRadius: "8px"
+                            }}
+                          >
+                            Synced to Calendar ✓
+                          </div>
+                        ) : !hasCalendarToken ? (
                           <button 
                             onClick={handleAuthorizeCalendar}
                             className="button button-secondary" 
@@ -374,7 +522,7 @@ export default function CopilotPage() {
                           </button>
                         ) : (
                           <button 
-                            onClick={() => handleAddEvents(msg.proposedEvents!)}
+                            onClick={() => handleAddEvents(msg.proposedEvents!, idx)}
                             className="button button-primary" 
                             style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", height: "38px", fontSize: "13px" }}
                           >
@@ -458,11 +606,11 @@ export default function CopilotPage() {
             <p className="muted" style={{ lineHeight: "1.45", fontSize: "12.5px" }}>
               Try asking:
               <br />
-              • <em>&quot;How should I complete my Coding project?&quot;</em>
+              • <em>&quot;How should I complete my Coding task?&quot;</em>
               <br />
               • <em>&quot;What should I do first today?&quot;</em>
               <br />
-              • <em>&quot;I need to study for exams, find focus blocks this week.&quot;</em>
+              • <em>&quot;I am not available for task_1234 at 10 AM, reschedule it.&quot;</em>
             </p>
           </div>
 

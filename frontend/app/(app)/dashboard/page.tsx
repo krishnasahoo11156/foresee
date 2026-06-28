@@ -92,6 +92,17 @@ export default function DashboardPage() {
 
   const displayName = profile?.name || user?.displayName || "User";
 
+  // Dynamic scheduled blocks from Firestore
+  const scheduledTasks = tasksList.filter(t => t.scheduledTime);
+  const displaySchedule = scheduledTasks.length > 0 
+    ? scheduledTasks.map(t => [
+        t.scheduledTime, 
+        t.category ? t.category.charAt(0).toUpperCase() + t.category.slice(1) : "Focus block", 
+        t.title,
+        t.taskId || t.id
+      ]).sort((a, b) => a[0].localeCompare(b[0])).slice(0, 4)
+    : schedule.slice(0, 4).map(s => [s[0], s[1], s[2], "mock"]);
+
   return (
     <section className="page page-wide">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px", marginBottom: "32px" }}>
@@ -153,11 +164,18 @@ export default function DashboardPage() {
             <Link href="/planner" className="muted" style={{ fontSize: "12px", textDecoration: "underline" }}>Open planner</Link>
           </div>
           <div className="timeline" style={{ padding: "8px 0", flex: 1 }}>
-            {schedule.slice(0, 4).map(([time, type, title]) => (
+            {displaySchedule.map(([time, type, title, taskId]) => (
               <div className="timeline-item" key={time}>
                 <span className="time">{time}</span>
                 <div style={{ padding: "2px 0" }}>
-                  <strong style={{ fontSize: "13.5px" }}>{type}</strong>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <strong style={{ fontSize: "13.5px" }}>{type}</strong>
+                    {taskId !== "mock" && (
+                      <span className="pill monitor" style={{ fontSize: "9px", padding: "1px 5px", textTransform: "none", letterSpacing: "normal" }}>
+                        ID: {taskId}
+                      </span>
+                    )}
+                  </div>
                   <p className="muted" style={{ margin: "2px 0 0", fontSize: "12px" }}>{title}</p>
                 </div>
               </div>
