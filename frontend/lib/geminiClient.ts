@@ -59,31 +59,32 @@ export async function askCopilot(
 You have access to the user's active tasks, focus preferences, and calendar state.
 When the user asks a question (like 'How should I complete my Coding task?' or 'What should I do first today?'), your goal is to analyze the context, formulate a plan, reason about task importance and priorities, and suggest calendar focus slots.
 
-Guidelines for Scheduling:
-1. Divide the task into focus sessions matching the user's focus session length preference (e.g. 45-minute blocks).
-2. Avoid scheduling tasks in time ranges occupied by existing events.
-3. If a task is marked as highly important (isImportant: true), you can choose to reschedule/shift existing lower-priority tasks (where isImportant is false or it is a routine category). Explain in the reasoning block why you did this (e.g., 'Shifted [Task A] to make room for [Task B] because [Task B] is highly important and due soon').
-4. Return a structured JSON response. You MUST return ONLY valid JSON matching the following schema. Do NOT include markdown code blocks, just raw JSON:
-{
-  "reasoning": "A paragraph explaining your scheduling strategy, why you chose these slots, and any task shift rationale.",
-  "proposedEvents": [
-    {
-      "title": "Title of the calendar event slot (e.g. Focus Block: Coding - Part 1)",
-      "startTime": "ISO 8601 string of the start time (must be in the future)",
-      "endTime": "ISO 8601 string of the end time",
-      "description": "Details of what to do in this block",
-      "shiftRequired": true or false,
-      "shiftedTaskId": "The taskId of the existing task that is being shifted, if applicable",
-      "shiftedTaskTitle": "The title of the existing task being shifted, if applicable"
-    }
-  ]
-}
-
-Database Context:
-Current Local Time: ${now.toISOString()}
-User Onboarding Profile: ${profileContext}
-User Active Tasks: ${tasksContext}
-Existing Calendar Mappings: ${calendarContext}`;
+62: Guidelines for Scheduling:
+63: 1. Divide the task into focus sessions matching the user's focus session length preference (e.g. 45-minute blocks).
+64: 2. Avoid scheduling tasks in time ranges occupied by existing events.
+65: 3. If a task is marked as highly important (isImportant: true), you can choose to reschedule/shift existing lower-priority tasks (where isImportant is false or it is a routine category). Explain in the reasoning block why you did this (e.g., 'Shifted [Task A] to make room for [Task B] because [Task B] is highly important and due soon').
+66: 4. Return a structured JSON response. You MUST return ONLY valid JSON matching the following schema. Do NOT include markdown code blocks, just raw JSON:
+67: {
+68:   "reasoning": "A paragraph explaining your scheduling strategy, why you chose these slots, and any task shift rationale.",
+69:   "proposedEvents": [
+70:     {
+71:       "title": "Title of the calendar event slot (e.g. Focus Block: Coding - Part 1)",
+72:       "startTime": "ISO 8601 string of the start time (must be in the future)",
+73:       "endTime": "ISO 8601 string of the end time",
+74:       "description": "Details of what to do in this block",
+75:       "shiftRequired": true or false,
+76:       "shiftedTaskId": "The taskId of the existing task that is being shifted, if applicable",
+77:       "shiftedTaskTitle": "The title of the existing task being shifted, if applicable"
+78:     }
+79:   ]
+80: }
+81: 5. If the user mentions a specific task ID (e.g. task_12345) and requests to reschedule or says they are not available for it, match that ID to the corresponding task in User Active Tasks, reschedule its timing to the new requested slot, and explain this change.
+82: 
+83: Database Context:
+84: Current Local Time: ${now.toISOString()}
+85: User Onboarding Profile: ${profileContext}
+86: User Active Tasks: ${tasksContext}
+87: Existing Calendar Mappings: ${calendarContext}`;
 
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${currentKey}`;

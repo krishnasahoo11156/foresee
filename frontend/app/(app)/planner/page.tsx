@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useAuth } from "@/components/AuthProvider";
+import { collection, query, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { 
   Calendar, 
   Clock, 
@@ -11,13 +14,11 @@ import {
   CheckCircle2, 
   AlertTriangle, 
   ArrowRight, 
-  Trash2,
   CalendarDays,
-  X,
-  Play
+  X
 } from "lucide-react";
 
-// Mock interface for Schedule Items
+// Interfaces
 interface ScheduleItem {
   id: string;
   time: string;
@@ -25,9 +26,9 @@ interface ScheduleItem {
   title: string;
   isRescued: boolean;
   originalTime: string;
+  taskId?: string;
 }
 
-// Mock interface for Sync Logs
 interface SyncLog {
   id: string;
   timestamp: string;
@@ -43,26 +44,13 @@ interface SyncLog {
 }
 
 export default function PlannerPage() {
-  // State for schedule items
-  const [scheduleList, setScheduleList] = useState<ScheduleItem[]>([
-    { id: "s1", time: "09:00", type: "Deep work", title: "Launch brief architecture narrative", isRescued: false, originalTime: "09:00" },
-    { id: "s2", time: "11:00", type: "Review", title: "Risk model and simulation copy", isRescued: false, originalTime: "11:00" },
-    { id: "s3", time: "14:00", type: "Build", title: "Rescue modal visual QA", isRescued: false, originalTime: "14:00" },
-    { id: "s4", time: "16:30", type: "Admin", title: "Calendar OAuth checklist", isRescued: false, originalTime: "16:30" },
-    { id: "s5", time: "19:00", type: "Demo", title: "Record walkthrough dry run", isRescued: false, originalTime: "19:00" }
-  ]);
-
-  // State for timeline logs
-  const [timelineLogs, setTimelineLogs] = useState<SyncLog[]>([
-    {
-      id: "log-initial",
-      timestamp: "08:30 AM",
-      action: "Initial Account Sync",
-      type: "sync",
-      description: "Successfully imported 5 focus blocks from connected Google Calendar account.",
-      details: "Connected profile: krishna@foresee.ai. Sync token refreshed."
-    }
-  ]);
+  const { user } = useAuth();
+  
+  // Real-time states
+  const [dbTasks, setDbTasks] = useState<any[]>([]);
+  const [dbMappings, setDbMappings] = useState<any[]>([]);
+  const [scheduleList, setScheduleList] = useState<ScheduleItem[]>([]);
+  const [timelineLogs, setTimelineLogs] = useState<SyncLog[]>([]);
 
   const [activeFilter, setActiveFilter] = useState<"all" | "sync" | "rescue">("all");
   const [movingItemId, setMovingItemId] = useState<string | null>(null);
@@ -76,7 +64,7 @@ export default function PlannerPage() {
     return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Sync animation handler
+  // Sync animation helper
   const triggerSync = (message: string) => {
     setIsSyncing(true);
     setSyncMessage(message);
@@ -86,110 +74,333 @@ export default function PlannerPage() {
     }, 1200);
   };
 
-  // Manual move handler
-  const handleSaveMove = (id: string) => {
-    if (!editTime.trim()) return;
+  // Subscribe to user tasks in Firestore
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "users", user.uid, "tasks"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items: any[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setDbTasks(items);
+    }, (err) => {
+      console.warn("Failed to load tasks for planner:", err);
+    });
+    return unsub;
+  }, [user]);
 
-    setScheduleList(prev => prev.map(item => {
-      if (item.id === id) {
-        // Log manual reschedule
-        const logTime = getFormattedTime();
+  // Subscribe to user calendarMappings in Firestore
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "users", user.uid, "calendarMappings"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items: any[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setDbMappings(items);
+    }, (err) => {
+      console.warn("Failed to load calendar mappings for planner:", err);
+    });
+    return unsub;
+  }, [user]);
+
+  // Merge Firestore tasks into the Daily Schedule Flow timeline
+  useEffect(() => {
+    // 1. Gather all tasks that have been scheduled
+    const scheduledTasks = dbTasks.filter(t => t.scheduledTime);
+    
+    if (scheduledTasks.length > 0) {
+      // Map to ScheduleItem format
+      const items: ScheduleItem[] = scheduledTasks.map(t => ({
+        id: t.id,
+        time: t.scheduledTime,
+        type: t.category ? t.category.charAt(0).toUpperCase() + t.category.slice(1) : "Focus block",
+        title: t.title,
+        isRescued: t.behaviorState === "slipping" || t.behaviorState === "rescued",
+        originalTime: t.originalTime || t.scheduledTime,
+        taskId: t.taskId || t.id
+      }));
+
+      // Sort chronologically
+      items.sort((a, b) => a.time.localeCompare(b.time));
+      setScheduleList(items);
+    } else {
+      // Fallback premium mock schedule if database is empty
+      setScheduleList([
+        { id: "s1", time: "09:00", type: "Deep work", title: "Launch brief architecture narrative", isRescued: false, originalTime: "09:00", taskId: "task_mock_1" },
+        { id: "s2", time: "11:00", type: "Review", title: "Risk model and simulation copy", isRescued: false, originalTime: "11:00", taskId: "task_mock_2" },
+        { id: "s3", time: "14:00", type: "Build", title: "Rescue modal visual QA", isRescued: false, originalTime: "14:00", taskId: "task_mock_3" },
+        { id: "s4", time: "16:30", type: "Admin", title: "Calendar OAuth checklist", isRescued: false, originalTime: "16:30", taskId: "task_mock_4" },
+        { id: "s5", time: "19:00", type: "Demo", title: "Record walkthrough dry run", isRescued: false, originalTime: "19:00", taskId: "task_mock_5" }
+      ]);
+    }
+  }, [dbTasks]);
+
+  // Construct Timeline Logs dynamically from Firestore calendarMappings
+  useEffect(() => {
+    if (dbMappings.length > 0) {
+      const logs: SyncLog[] = [];
+      
+      // Sort mappings descending by creation date
+      const sortedMappings = [...dbMappings].sort((a, b) => {
+        const timeA = a.createdAt?.seconds ? a.createdAt.seconds : new Date(a.syncTimestamp || 0).getTime() / 1000;
+        const timeB = b.createdAt?.seconds ? b.createdAt.seconds : new Date(b.syncTimestamp || 0).getTime() / 1000;
+        return timeB - timeA;
+      });
+
+      sortedMappings.forEach((m) => {
+        const dateObj = new Date(m.syncTimestamp);
+        const logTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        const isRescue = m.status === "rescued" || m.source?.toLowerCase().includes("rescue");
+        
+        logs.push({
+          id: m.id,
+          timestamp: logTime,
+          action: m.status === "rescued" ? "Rescue Planner Intervention" : (m.action || "Google Calendar Sync"),
+          type: isRescue ? "rescue" : "sync",
+          description: m.description || `Synchronized ${m.scheduledBlocks?.length || 0} event focus block(s) to Google Calendar.`,
+          details: m.source ? `Source: ${m.source}. Connected profile: krishna@foresee.ai.` : "Connected profile: krishna@foresee.ai.",
+          changes: m.changes || (m.scheduledBlocks ? m.scheduledBlocks.map((b: any) => ({
+            taskTitle: b.title,
+            before: "Google Cal",
+            after: b.startTime ? new Date(b.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Scheduled"
+          })) : [])
+        });
+      });
+
+      setTimelineLogs(logs);
+    } else {
+      // Fallback mock initial sync log
+      setTimelineLogs([
+        {
+          id: "log-initial",
+          timestamp: "08:30 AM",
+          action: "Initial Account Sync",
+          type: "sync",
+          description: "Successfully imported 5 focus blocks from connected Google Calendar account.",
+          details: "Connected profile: krishna@foresee.ai. Sync token refreshed."
+        }
+      ]);
+    }
+  }, [dbMappings]);
+
+  // Manual Reschedule Move Handler (saves to Firestore)
+  const handleSaveMove = async (id: string) => {
+    if (!user || !editTime.trim()) return;
+
+    // Check if the item is a real Firestore task or mock
+    const targetItem = scheduleList.find(item => item.id === id);
+    if (!targetItem) return;
+
+    const logTime = getFormattedTime();
+
+    try {
+      if (targetItem.taskId && !targetItem.taskId.startsWith("task_mock_")) {
+        // 1. Update the task time and deadline in Firestore tasks collection
+        const taskDocRef = doc(db, "users", user.uid, "tasks", id);
+        
+        // Calculate new deadline based on editTime
+        const newDeadlineDate = new Date();
+        const [hours, minutes] = editTime.split(":");
+        newDeadlineDate.setHours(Number(hours), Number(minutes), 0, 0);
+
+        await updateDoc(taskDocRef, {
+          scheduledTime: editTime,
+          deadline: newDeadlineDate.toISOString(),
+          calendarState: "synced",
+          updatedAt: new Date().toISOString()
+        });
+
+        // 2. Add a new sync log in Firestore calendarMappings
+        await addDoc(collection(db, "users", user.uid, "calendarMappings"), {
+          mappingId: `map_${Date.now()}`,
+          syncTimestamp: new Date().toISOString(),
+          status: "synced",
+          action: "Manual Reschedule Sync",
+          source: "User Planner Drag",
+          description: `User manually rescheduled focus block: "${targetItem.type}"`,
+          changes: [
+            {
+              taskTitle: targetItem.title,
+              before: targetItem.time,
+              after: editTime
+            }
+          ],
+          scheduledBlocks: [
+            {
+              title: targetItem.title,
+              startTime: newDeadlineDate.toISOString(),
+              endTime: new Date(newDeadlineDate.getTime() + 1.5 * 3600 * 1000).toISOString(),
+              description: `Focus session. [ID: ${targetItem.taskId}]`,
+              taskId: targetItem.taskId
+            }
+          ],
+          createdAt: serverTimestamp()
+        });
+
+        triggerSync("Syncing manual reschedule to Google Calendar...");
+      } else {
+        // Fallback for mock items if they aren't written to Firestore yet
+        setScheduleList(prev => prev.map(item => {
+          if (item.id === id) {
+            return { ...item, time: editTime };
+          }
+          return item;
+        }));
+
         const newLog: SyncLog = {
-          id: `log-manual-${Date.now()}`,
+          id: `log-manual-mock-${Date.now()}`,
           timestamp: logTime,
           action: "Manual Reschedule Detected",
           type: "sync",
-          description: `User manually rescheduled "${item.type}" focus block.`,
-          details: `Moved from ${item.time} to ${editTime}. Changes synced to Google Calendar.`,
+          description: `User manually rescheduled mock focus block "${targetItem.type}".`,
+          details: `Moved from ${targetItem.time} to ${editTime}. Synced back to Google Calendar.`,
           changes: [
             {
-              taskTitle: item.title,
-              before: item.time,
+              taskTitle: targetItem.title,
+              before: targetItem.time,
               after: editTime
             }
           ]
         };
         setTimelineLogs(prevLogs => [newLog, ...prevLogs]);
         triggerSync("Syncing manual reschedule to Google Calendar...");
-        return { ...item, time: editTime };
       }
-      return item;
-    }));
+    } catch (err) {
+      console.error("Failed to update task schedule:", err);
+    }
 
     setMovingItemId(null);
     setEditTime("");
   };
 
-  // AI Rescue simulation handler
-  const handleSimulateRescue = () => {
-    // Find unrescued items to shift
-    const targetItem = scheduleList.find(item => item.id === "s2" || item.id === "s3");
-    if (!targetItem) {
-      alert("All events have already been adjusted by the Rescue Planner.");
-      return;
-    }
+  // AI Rescue simulation handler (saves to Firestore)
+  const handleSimulateRescue = async () => {
+    if (!user) return;
+
+    // Check if we have real tasks in Firestore to rescue
+    const rescueableTasks = dbTasks.filter(t => t.scheduledTime && (t.id === "s2" || t.id === "s3" || t.title.toLowerCase().includes("risk") || t.title.toLowerCase().includes("rescue")));
 
     const logTime = getFormattedTime();
-    
-    // Simulate AI Rescue shifts
-    setScheduleList(prev => {
-      const updated = prev.map(item => {
-        if (item.id === "s2") {
-          return { ...item, time: "12:15", isRescued: true };
-        }
-        if (item.id === "s3") {
-          return { ...item, time: "15:30", isRescued: true };
-        }
-        return item;
-      });
 
-      // Log Rescue intervention
-      const newLog: SyncLog = {
-        id: `log-rescue-${Date.now()}`,
-        timestamp: logTime,
-        action: "Rescue Planner Intervention",
-        type: "rescue",
-        description: "AI detected a 45-minute focus deficit in Review block. Auto-shifting schedule.",
-        details: "Rescheduled Review (+1h 15m) and Build (+1h 30m) to protect focus capacity. Synced updates to Google Calendar.",
-        changes: [
-          {
-            taskTitle: "Risk model and simulation copy",
-            before: "11:00",
-            after: "12:15"
-          },
-          {
-            taskTitle: "Rescue modal visual QA",
-            before: "14:00",
-            after: "15:30"
+    try {
+      if (rescueableTasks.length > 0) {
+        const changesList: any[] = [];
+        const blocksList: any[] = [];
+
+        // Shift real tasks in Firestore
+        for (const task of rescueableTasks) {
+          const taskDocRef = doc(db, "users", user.uid, "tasks", task.id);
+          const oldTime = task.scheduledTime;
+          let newTime = "";
+          let newDeadlineDate = new Date();
+
+          if (task.title.toLowerCase().includes("risk") || task.id === "s2") {
+            newTime = "12:15";
+            newDeadlineDate.setHours(12, 15, 0, 0);
+          } else {
+            newTime = "15:30";
+            newDeadlineDate.setHours(15, 30, 0, 0);
           }
-        ]
-      };
-      setTimelineLogs(prevLogs => [newLog, ...prevLogs]);
-      return updated;
-    });
 
-    triggerSync("AI Intervention: Re-optimizing Google Calendar schedule...");
+          await updateDoc(taskDocRef, {
+            scheduledTime: newTime,
+            deadline: newDeadlineDate.toISOString(),
+            behaviorState: "rescued",
+            updatedAt: new Date().toISOString()
+          });
+
+          changesList.push({
+            taskTitle: task.title,
+            before: oldTime,
+            after: newTime
+          });
+
+          blocksList.push({
+            title: task.title,
+            startTime: newDeadlineDate.toISOString(),
+            endTime: new Date(newDeadlineDate.getTime() + 1.5 * 3600 * 1000).toISOString(),
+            description: `Rescued by AI Copilot. [ID: ${task.taskId || task.id}]`,
+            taskId: task.taskId || task.id
+          });
+        }
+
+        // Add a new Rescue mapping log in Firestore
+        await addDoc(collection(db, "users", user.uid, "calendarMappings"), {
+          mappingId: `map_rescue_${Date.now()}`,
+          syncTimestamp: new Date().toISOString(),
+          status: "rescued",
+          action: "Rescue Planner Intervention",
+          source: "AI Co-Optimizer Graph",
+          description: "AI detected a 45-minute focus deficit. Auto-shifting schedule to maximize capacity.",
+          changes: changesList,
+          scheduledBlocks: blocksList,
+          createdAt: serverTimestamp()
+        });
+
+        triggerSync("AI Intervention: Re-optimizing Google Calendar schedule...");
+      } else {
+        // Fallback for mock demo rescue simulation
+        setScheduleList(prev => prev.map(item => {
+          if (item.id === "s2") {
+            return { ...item, time: "12:15", isRescued: true };
+          }
+          if (item.id === "s3") {
+            return { ...item, time: "15:30", isRescued: true };
+          }
+          return item;
+        }));
+
+        // Log Rescue intervention in mock logs
+        const newLog: SyncLog = {
+          id: `log-rescue-mock-${Date.now()}`,
+          timestamp: logTime,
+          action: "Rescue Planner Intervention",
+          type: "rescue",
+          description: "AI detected a 45-minute focus deficit in Review block. Auto-shifting schedule.",
+          details: "Rescheduled Review (+1h 15m) and Build (+1h 30m) to protect focus capacity. Synced updates to Google Calendar.",
+          changes: [
+            {
+              taskTitle: "Risk model and simulation copy",
+              before: "11:00",
+              after: "12:15"
+            },
+            {
+              taskTitle: "Rescue modal visual QA",
+              before: "14:00",
+              after: "15:30"
+            }
+          ]
+        };
+        setTimelineLogs(prevLogs => [newLog, ...prevLogs]);
+        triggerSync("AI Intervention: Re-optimizing Google Calendar schedule...");
+      }
+    } catch (err) {
+      console.error("Failed to execute simulated AI rescue:", err);
+    }
   };
 
   // Reset demo state
   const handleResetDemo = () => {
-    setScheduleList([
-      { id: "s1", time: "09:00", type: "Deep work", title: "Launch brief architecture narrative", isRescued: false, originalTime: "09:00" },
-      { id: "s2", time: "11:00", type: "Review", title: "Risk model and simulation copy", isRescued: false, originalTime: "11:00" },
-      { id: "s3", time: "14:00", type: "Build", title: "Rescue modal visual QA", isRescued: false, originalTime: "14:00" },
-      { id: "s4", time: "16:30", type: "Admin", title: "Calendar OAuth checklist", isRescued: false, originalTime: "16:30" },
-      { id: "s5", time: "19:00", type: "Demo", title: "Record walkthrough dry run", isRescued: false, originalTime: "19:00" }
-    ]);
-    setTimelineLogs([
-      {
-        id: "log-initial",
-        timestamp: "08:30 AM",
-        action: "Initial Account Sync",
-        type: "sync",
-        description: "Successfully imported 5 focus blocks from connected Google Calendar account.",
-        details: "Connected profile: krishna@foresee.ai. Sync token refreshed."
-      }
-    ]);
+    // If user has real Firestore records, we reset them!
+    if (user && dbTasks.length > 0) {
+      dbTasks.forEach(async (task) => {
+        if (task.scheduledTime) {
+          const taskDocRef = doc(db, "users", user.uid, "tasks", task.id);
+          let originalResetTime = task.originalTime || "09:00";
+          
+          await updateDoc(taskDocRef, {
+            scheduledTime: originalResetTime,
+            behaviorState: "stable",
+            updatedAt: new Date().toISOString()
+          });
+        }
+      });
+    }
+
     triggerSync("Resetting calendar sync state...");
   };
 
@@ -282,6 +493,12 @@ export default function PlannerPage() {
                       )}
                     </div>
                     <p className="muted" style={{ margin: "2px 0 0", fontSize: "12.5px" }}>{item.title}</p>
+                    
+                    {item.taskId && (
+                      <span className="pill monitor" style={{ fontSize: "9px", display: "inline-block", marginTop: "6px", textTransform: "none", letterSpacing: "normal" }}>
+                        ID: {item.taskId}
+                      </span>
+                    )}
 
                     {/* Inline Time Editor */}
                     {movingItemId === item.id && (

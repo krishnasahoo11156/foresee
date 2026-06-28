@@ -252,6 +252,9 @@ export default function TasksPage() {
                     <td>
                       <Link href={`/tasks/${task.id}`} style={{ display: "block" }}>
                         <strong style={{ fontSize: "14px", color: "var(--text)" }}>{task.title}</strong>
+                        <span className="pill monitor" style={{ marginLeft: "8px", padding: "1px 6px", fontSize: "9px", textTransform: "none", letterSpacing: "normal" }}>
+                          ID: {task.taskId || task.id}
+                        </span>
                         {task.isImportant && (
                           <span className="pill danger" style={{ marginLeft: "8px", padding: "1px 6px", fontSize: "9px" }}>
                             IMPORTANT
