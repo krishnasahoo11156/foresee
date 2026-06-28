@@ -612,3 +612,23 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
   .page-header { flex-direction: column; gap: 16px; margin-bottom: 28px; }
   .marketing-links { display: none; }
 }
+
+/* Sidebar and Topbar Red Logout Buttons */
+.sidebar-home-link.logout-btn-red {
+  color: var(--danger);
+}
+.sidebar-home-link.logout-btn-red:hover {
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--danger);
+}
+
+.theme-switch-btn.logout-btn-red {
+  color: var(--danger);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+.theme-switch-btn.logout-btn-red:hover {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+

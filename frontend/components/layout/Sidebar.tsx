@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Eye, ChevronLeft, ChevronRight, Home } from "lucide-react";
+import { Eye, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import { navSections } from "@/lib/data";
+import { useAuth } from "@/components/AuthProvider";
 
 export function Brand({ collapsed }: { collapsed?: boolean }) {
   return (
@@ -21,6 +22,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
+  const { signOut } = useAuth();
 
   return (
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
@@ -43,10 +45,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         ))}
       </div>
       <div className="sidebar-footer">
-        <Link className="sidebar-home-link" href="/">
-          <Home size={17} />
-          <span className="sidebar-home-text">Home page</span>
-        </Link>
+        <button className="sidebar-home-link logout-btn-red" onClick={signOut}>
+          <LogOut size={17} />
+          <span className="sidebar-home-text">Log Out</span>
+        </button>
         <button className="sidebar-collapse-btn" onClick={onToggle} aria-label="Collapse sidebar">
           {collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
           <span className="sidebar-collapse-text">Collapse menu</span>
