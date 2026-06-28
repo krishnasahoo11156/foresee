@@ -2,19 +2,24 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Clock, Play } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Play, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useAuth } from "@/components/AuthProvider";
-import { collection, query, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { collection, query, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { calculateRiskAndClassification } from "@/lib/riskEngine";
-import { updateGoogleCalendarEvent } from "@/lib/googleCalendar";
+import { updateGoogleCalendarEvent, deleteGoogleCalendarEvent } from "@/lib/googleCalendar";
+import { useRouter } from "next/navigation";
 
 export default function TaskDetailPage({ params }: { params: { id: string } }) {
   const { user, profile } = useAuth();
+  const router = useRouter();
   const [tasksList, setTasksList] = useState<any[]>([]);
   const [subtasksList, setSubtasksList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Subscribe to all tasks to calculate sorted risk ranking
   useEffect(() => {
@@ -168,6 +173,46 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
     }
   };
 
+  const handleDeleteTask = async () => {
+    if (!user || !originalTask) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      // 1. Delete associated subtasks from Google Calendar if token exists
+      const token = localStorage.getItem(`google_calendar_token_${user.uid}`);
+      if (token) {
+        for (const subtask of subtasksList) {
+          if (subtask.calendarEventId) {
+            try {
+              await deleteGoogleCalendarEvent(token, subtask.calendarEventId);
+            } catch (calErr) {
+              console.warn("Failed to delete Google Calendar event for subtask:", subtask.id || subtask.subtaskId, calErr);
+            }
+          }
+        }
+      }
+
+      // 2. Delete subtasks from Firestore
+      for (const subtask of subtasksList) {
+        const subtaskDocId = subtask.id || subtask.subtaskId;
+        if (subtaskDocId) {
+          await deleteDoc(doc(db, "users", user.uid, "subtasks", subtaskDocId));
+        }
+      }
+
+      // 3. Delete the parent task document
+      await deleteDoc(doc(db, "users", user.uid, "tasks", originalTask.id || originalTask.taskId));
+
+      // 4. Redirect to tasks list
+      router.push("/tasks");
+    } catch (err: any) {
+      console.error("Failed to delete task:", err);
+      setDeleteError(err.message || "An error occurred while deleting the task. Please try again.");
+      setIsDeleting(false);
+    }
+  };
+
   // Blocker dependencies
   const dependencies = originalTask.dependencies || [];
 
@@ -184,15 +229,40 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
         title={originalTask.title} 
         description={`${task.deadline} • Effort: ${task.effort}`} 
         action={
-          (analysis.riskLevel === "critical" || analysis.riskLevel === "danger") ? (
-            <Link className="button button-primary" href="/rescue" style={{ background: "var(--danger)" }}>
-              <Play size={14} /> Initiate Rescue Protocol
-            </Link>
-          ) : (
-            <Link className="button button-secondary" href="/rescue">
-              <Play size={14} /> Run rescue analysis
-            </Link>
-          )
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <button 
+              className="button button-secondary" 
+              onClick={() => setIsConfirmOpen(true)}
+              style={{
+                borderColor: "rgba(220, 38, 38, 0.4)",
+                color: "#ef4444",
+                background: "rgba(220, 38, 38, 0.05)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                transition: "all 0.2s ease-in-out"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(220, 38, 38, 0.12)";
+                e.currentTarget.style.borderColor = "#ef4444";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(220, 38, 38, 0.05)";
+                e.currentTarget.style.borderColor = "rgba(220, 38, 38, 0.4)";
+              }}
+            >
+              <Trash2 size={14} /> Delete task
+            </button>
+            {(analysis.riskLevel === "critical" || analysis.riskLevel === "danger") ? (
+              <Link className="button button-primary" href="/rescue" style={{ background: "var(--danger)" }}>
+                <Play size={14} /> Initiate Rescue Protocol
+              </Link>
+            ) : (
+              <Link className="button button-secondary" href="/rescue">
+                <Play size={14} /> Run rescue analysis
+              </Link>
+            )}
+          </div>
         } 
       />
 
@@ -355,6 +425,149 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
           </div>
         </div>
       </div>
+
+      {/* Premium Deletion Confirmation Modal */}
+      {isConfirmOpen && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          backgroundColor: "rgba(10, 10, 10, 0.75)",
+          backdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 9999,
+          padding: "16px"
+        }}>
+          <div style={{
+            position: "relative",
+            maxWidth: "460px",
+            width: "100%",
+            padding: "32px",
+            background: "var(--bg)",
+            border: "1px solid var(--surface-line)",
+            borderRadius: "16px",
+            boxShadow: "0 20px 50px rgba(0,0,0,0.3)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", color: "var(--danger)" }}>
+              <div style={{
+                background: "rgba(220, 38, 38, 0.1)",
+                borderRadius: "50%",
+                padding: "10px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}>
+                <Trash2 size={24} style={{ color: "#ef4444" }} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "700", color: "var(--text)" }}>Delete Task?</h3>
+            </div>
+
+            <p className="muted" style={{ margin: 0, fontSize: "14.5px", lineHeight: "1.6" }}>
+              Are you sure you want to delete <strong style={{ color: "var(--text)" }}>"{originalTask.title}"</strong>?
+              This will permanently remove this task, its subtasks, and desync them from your Google Calendar. This action cannot be undone.
+            </p>
+
+            {subtasksList.length > 0 && (
+              <div style={{
+                background: "var(--surface-soft)",
+                borderRadius: "8px",
+                padding: "12px 16px",
+                borderLeft: "3px solid #ef4444",
+                fontSize: "13px"
+              }}>
+                <div className="muted" style={{ fontWeight: 600, marginBottom: "4px" }}>Items to be deleted:</div>
+                <ul style={{ margin: 0, paddingLeft: "16px", color: "var(--muted)", display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <li>Main task details and risk profile</li>
+                  <li>{subtasksList.length} subtask{subtasksList.length > 1 ? "s" : ""} in execution plan</li>
+                  {subtasksList.some(s => s.calendarEventId) && <li>Linked Google Calendar event blocks</li>}
+                </ul>
+              </div>
+            )}
+
+            {/* Error display if any */}
+            {deleteError && (
+              <div style={{
+                background: "rgba(220, 38, 38, 0.05)",
+                border: "1px solid #ef4444",
+                borderRadius: "8px",
+                color: "#ef4444",
+                padding: "10px 14px",
+                fontSize: "13px"
+              }}>
+                {deleteError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "8px" }}>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => {
+                  if (!isDeleting) {
+                    setIsConfirmOpen(false);
+                    setDeleteError(null);
+                  }
+                }}
+                disabled={isDeleting}
+                style={{ padding: "10px 20px", borderRadius: "8px", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button"
+                onClick={handleDeleteTask}
+                disabled={isDeleting}
+                style={{
+                  background: "#ef4444",
+                  color: "#fff",
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  border: "none",
+                  fontWeight: "600",
+                  opacity: isDeleting ? 0.7 : 1
+                }}
+              >
+                {isDeleting ? (
+                  <>
+                    <span className="spinner" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete Permanently"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .spinner {
+          width: 14px;
+          height: 14px;
+          border: 2px solid rgba(255,255,255,0.3);
+          border-top-color: #fff;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          display: inline-block;
+        }
+      `}</style>
     </section>
   );
 }

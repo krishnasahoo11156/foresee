@@ -198,3 +198,29 @@ export async function listGoogleCalendarEvents(
   const data = await response.json();
   return data.items || [];
 }
+
+/**
+ * Deletes a single event from the user's primary Google Calendar.
+ */
+export async function deleteGoogleCalendarEvent(
+  accessToken: string,
+  eventId: string
+): Promise<void> {
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`;
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+  if (!response.ok && response.status !== 410) { // 410 means event is already gone
+    const errorJson = await response.json().catch(() => null);
+    const errMsg = errorJson?.error?.message || `Google Calendar API DELETE Error: ${response.status}`;
+    const err = new Error(errMsg) as any;
+    err.status = response.status;
+    throw err;
+  }
+}
+
