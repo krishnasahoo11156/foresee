@@ -301,7 +301,8 @@ export default function TasksPage() {
           zIndex: 9999,
           padding: "16px"
         }}>
-          <div className="card" style={{
+          <div style={{
+            position: "relative",
             maxWidth: "520px",
             width: "100%",
             padding: "28px",
