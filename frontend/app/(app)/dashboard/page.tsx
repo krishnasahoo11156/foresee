@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const { theme } = useTheme();
   const { user, profile } = useAuth();
   const [tasksList, setTasksList] = useState<any[]>([]);
+  const [subtasksList, setSubtasksList] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -29,6 +30,21 @@ export default function DashboardPage() {
       setTasksList(items);
     }, (err) => {
       console.warn("Failed to subscribe to dashboard tasks:", err);
+    });
+    return unsub;
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "users", user.uid, "subtasks"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items: any[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setSubtasksList(items);
+    }, (err) => {
+      console.warn("Failed to subscribe to dashboard subtasks:", err);
     });
     return unsub;
   }, [user]);
@@ -92,15 +108,25 @@ export default function DashboardPage() {
 
   const displayName = profile?.name || user?.displayName || "User";
 
-  // Dynamic scheduled blocks from Firestore
-  const scheduledTasks = tasksList.filter(t => t.scheduledTime);
-  const displaySchedule = scheduledTasks.length > 0 
-    ? scheduledTasks.map(t => [
-        t.scheduledTime, 
-        t.category ? t.category.charAt(0).toUpperCase() + t.category.slice(1) : "Focus block", 
-        t.title,
-        t.taskId || t.id
-      ]).sort((a, b) => a[0].localeCompare(b[0])).slice(0, 4)
+  // Dynamic scheduled blocks from Firestore subtasks
+  const scheduledSubtasks = subtasksList.filter(s => s.startTime);
+  const displaySchedule = scheduledSubtasks.length > 0
+    ? scheduledSubtasks.map(s => {
+        const parentTask = tasksList.find(t => t.id === s.taskId || t.taskId === s.taskId);
+        const categoryLabel = parentTask?.category 
+          ? parentTask.category.charAt(0).toUpperCase() + parentTask.category.slice(1)
+          : "Focus block";
+        
+        const start = new Date(s.startTime);
+        const formattedTime = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        
+        return [
+          formattedTime,
+          categoryLabel,
+          parentTask ? `[${parentTask.title}] - ${s.title}` : s.title,
+          s.taskId
+        ];
+      }).sort((a, b) => String(a[0]).localeCompare(String(b[0]))).slice(0, 4)
     : schedule.slice(0, 4).map(s => [s[0], s[1], s[2], "mock"]);
 
   return (

@@ -7,11 +7,13 @@ import { TaskCard } from "@/components/ui/TaskCard";
 import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
 import { TimelineHeatmap } from "@/components/ui/TimelineHeatmap";
 import { useAuth } from "@/components/AuthProvider";
-import { collection, query, onSnapshot, addDoc } from "firebase/firestore";
+import { collection, query, onSnapshot, addDoc, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { calculateRiskAndClassification } from "@/lib/riskEngine";
+import { generateSubtasksWithAI, scheduleSubtasksWithGemini } from "@/lib/geminiClient";
+import { syncEventsToGoogleCalendar, listGoogleCalendarEvents } from "@/lib/googleCalendar";
 
 export default function TasksPage() {
   const { user, profile } = useAuth();
@@ -29,6 +31,15 @@ export default function TasksPage() {
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineTime, setDeadlineTime] = useState("18:00");
   const [isImportant, setIsImportant] = useState(false);
+
+  // Subtasks and Calendar states
+  const [subtasks, setSubtasks] = useState<Array<{ title: string; estimatedHours: number }>>([]);
+  const [allSubtasksList, setAllSubtasksList] = useState<any[]>([]);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [newSubtaskHours, setNewSubtaskHours] = useState<number>(0.5);
+  const [isGeneratingSubtasks, setIsGeneratingSubtasks] = useState(false);
+  const [calendarMappings, setCalendarMappings] = useState<any[]>([]);
+  const [hasCalendarToken, setHasCalendarToken] = useState(false);
 
   // Advanced Optional parameters
   const [category, setCategory] = useState<string>("Coding");
@@ -75,6 +86,45 @@ export default function TasksPage() {
     return unsub;
   }, [user]);
 
+  // Check for local storage calendar token
+  useEffect(() => {
+    if (user) {
+      setHasCalendarToken(!!localStorage.getItem(`google_calendar_token_${user.uid}`));
+    }
+  }, [user]);
+
+  // Subscribe to calendar mappings
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "users", user.uid, "calendarMappings"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items: any[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setCalendarMappings(items);
+    }, (err) => {
+      console.warn("Failed to subscribe to calendar mappings:", err);
+    });
+    return unsub;
+  }, [user]);
+
+  // Subscribe to all subtasks for heatmap workload calculations
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "users", user.uid, "subtasks"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items: any[] = [];
+      snapshot.forEach((doc) => {
+        items.push({ id: doc.id, ...doc.data() });
+      });
+      setAllSubtasksList(items);
+    }, (err) => {
+      console.warn("Failed to subscribe to all subtasks:", err);
+    });
+    return unsub;
+  }, [user]);
+
   const closeModal = () => {
     setIsModalOpen(false);
     router.push("/tasks");
@@ -90,11 +140,47 @@ export default function TasksPage() {
       const requirements = requirementsInput.split(",").map(r => r.trim()).filter(Boolean);
       const dependencies = dependenciesInput.split(",").map(d => d.trim()).filter(Boolean);
 
+      // 1. Prepare final list of subtasks
+      let finalSubtasks = [...subtasks];
+      if (finalSubtasks.length === 0) {
+        const defaultHours = difficulty === "easy" ? 1.0 : difficulty === "medium" ? 2.0 : 4.0;
+        finalSubtasks = [{ title: title, estimatedHours: defaultHours }];
+      }
+
+      const totalHours = finalSubtasks.reduce((sum, s) => sum + s.estimatedHours, 0);
+
+      // 2. Schedule subtasks using Gemini API
+      let scheduledSlots: any[] = [];
+      try {
+        scheduledSlots = await scheduleSubtasksWithGemini(
+          title,
+          deadlineString,
+          finalSubtasks,
+          tasksList,
+          profile,
+          calendarMappings
+        );
+      } catch (err) {
+        console.warn("Failed to schedule subtasks via Gemini, using fallback:", err);
+        // Fallback layout sequential
+        let cursor = new Date(Date.now() + 2 * 3600 * 1000);
+        scheduledSlots = finalSubtasks.map(s => {
+          const start = new Date(cursor);
+          const end = new Date(start.getTime() + s.estimatedHours * 3600 * 1000);
+          cursor = new Date(end.getTime() + 1 * 3600 * 1000);
+          return { title: s.title, startTime: start.toISOString(), endTime: end.toISOString() };
+        });
+      }
+
+      // 3. Generate Firestore IDs
+      const taskDocRef = doc(collection(db, "users", user.uid, "tasks"));
+      const taskId = taskDocRef.id;
+
       const tempTask: any = {
-        taskId: `task_${Date.now()}`,
+        taskId: taskId,
         userId: user.uid,
         title,
-        estimatedHours: Number(hours),
+        estimatedHours: totalHours,
         difficulty,
         deadline: deadlineString,
         isImportant,
@@ -132,13 +218,78 @@ export default function TasksPage() {
         difficulty: analysis.difficulty,
         planningState: analysis.planningState,
         behaviorState: analysis.behaviorState,
-        calendarState: analysis.calendarState,
+        calendarState: hasCalendarToken ? ("scheduled" as any) : ("unscheduled" as any),
         dependencyState: analysis.dependencyState,
         progressState: analysis.progressState,
         factors: analysis.factors
       };
 
-      await addDoc(collection(db, "users", user.uid, "tasks"), taskDoc);
+      // 4. Save Task to Firestore
+      await setDoc(taskDocRef, taskDoc);
+
+      // 5. Save Subtasks to Firestore and Sync to Google Calendar
+      const token = localStorage.getItem(`google_calendar_token_${user.uid}`);
+      
+      const subtaskWritePromises = finalSubtasks.map(async (st, sIdx) => {
+        const slot = scheduledSlots.find(s => s.title === st.title) || scheduledSlots[sIdx] || {
+          startTime: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
+          endTime: new Date(Date.now() + 3.5 * 3600 * 1000).toISOString()
+        };
+
+        const subtaskId = `subtask_${Date.now()}_${sIdx}_${Math.floor(Math.random() * 1000)}`;
+        
+        let calendarEventId = "";
+        if (hasCalendarToken && token) {
+          try {
+            await syncEventsToGoogleCalendar(user.uid, [{
+              summary: `[${title}] - ${st.title}`,
+              description: `Focus block scheduled via ForeSee. [Subtask ID: ${subtaskId}] [Task ID: ${taskId}]`,
+              startTime: slot.startTime,
+              endTime: slot.endTime
+            }]);
+            
+            // List events to find our new event ID
+            const timeMin = new Date(Date.now() - 3600 * 1000).toISOString();
+            const events = await listGoogleCalendarEvents(token, timeMin);
+            const foundEvent = events.find((e: any) => (e.description || "").includes(`[Subtask ID: ${subtaskId}]`));
+            if (foundEvent) {
+              calendarEventId = foundEvent.id;
+            }
+          } catch (calErr) {
+            console.error("Google Calendar subtask creation failed:", calErr);
+          }
+        }
+
+        const subtaskDocRef = doc(collection(db, "users", user.uid, "subtasks"), subtaskId);
+        await setDoc(subtaskDocRef, {
+          subtaskId,
+          taskId,
+          title: st.title,
+          estimatedHours: st.estimatedHours,
+          isCompleted: false,
+          order: sIdx + 1,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          calendarEventId
+        });
+      });
+
+      await Promise.all(subtaskWritePromises);
+
+      // Create a calendarMapping entry
+      await addDoc(collection(db, "users", user.uid, "calendarMappings"), {
+        mappingId: `map_${Date.now()}`,
+        syncTimestamp: new Date().toISOString(),
+        status: "synced",
+        source: "AI Auto-Scheduler",
+        scheduledBlocks: scheduledSlots.map((s, sIdx) => ({
+          title: `[${title}] - ${s.title}`,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          description: `Focus block scheduled via ForeSee.`
+        })),
+        createdAt: new Date().toISOString()
+      });
 
       // Reset form fields
       setTitle("");
@@ -155,6 +306,9 @@ export default function TasksPage() {
       setRequiresInternet(true);
       setRequirementsInput("laptop");
       setDependenciesInput("");
+      setSubtasks([]);
+      setNewSubtaskTitle("");
+      setNewSubtaskHours(0.5);
       
       closeModal();
     } catch (err) {
@@ -213,7 +367,7 @@ export default function TasksPage() {
       </div>
 
       <div style={{ marginBottom: "32px" }}>
-        <TimelineHeatmap tasks={computedTasks} dailyCapacity={dailyCapacity} />
+        <TimelineHeatmap tasks={computedTasks} subtasks={allSubtasksList} dailyCapacity={dailyCapacity} />
       </div>
 
       <div className="grid grid-3" style={{ marginBottom: "32px", gap: "24px" }}>
@@ -301,7 +455,8 @@ export default function TasksPage() {
           zIndex: 9999,
           padding: "16px"
         }}>
-          <div className="card" style={{
+          <div style={{
+            position: "relative",
             maxWidth: "520px",
             width: "100%",
             padding: "28px",
@@ -335,19 +490,7 @@ export default function TasksPage() {
                 />
               </label>
               
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                <label className="label">
-                  <span>Expected hours</span>
-                  <input 
-                    type="number" 
-                    required 
-                    min="0.5" 
-                    step="0.5" 
-                    className="input" 
-                    value={hours}
-                    onChange={e => setHours(Number(e.target.value))}
-                  />
-                </label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "16px" }}>
                 <label className="label">
                   <span>Difficulty</span>
                   <select 
@@ -360,6 +503,85 @@ export default function TasksPage() {
                     <option value="hard">Hard (high focus)</option>
                   </select>
                 </label>
+              </div>
+
+              {/* Subtasks builder */}
+              <div style={{ border: "1px solid var(--surface-line)", borderRadius: "8px", padding: "12px", background: "var(--surface-soft)", display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <strong style={{ fontSize: "12px", color: "var(--accent)" }}>Subtasks Execution Plan</strong>
+                  <button
+                    type="button"
+                    disabled={isGeneratingSubtasks || !title.trim()}
+                    onClick={async () => {
+                      setIsGeneratingSubtasks(true);
+                      try {
+                        const aiSubtasks = await generateSubtasksWithAI(title, category, difficulty);
+                        setSubtasks(aiSubtasks);
+                      } catch (err) {
+                        console.error(err);
+                      } finally {
+                        setIsGeneratingSubtasks(false);
+                      }
+                    }}
+                    className="button button-secondary"
+                    style={{ height: "26px", fontSize: "11px", padding: "0 8px", minHeight: "auto" }}
+                  >
+                    {isGeneratingSubtasks ? "Generating..." : "⚡ AI Generate"}
+                  </button>
+                </div>
+
+                {subtasks.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {subtasks.map((st, sIdx) => (
+                      <div key={sIdx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--surface)", padding: "6px 10px", borderRadius: "6px", fontSize: "12.5px" }}>
+                        <span>{st.title} ({st.estimatedHours}h)</span>
+                        <button
+                          type="button"
+                          onClick={() => setSubtasks(prev => prev.filter((_, i) => i !== sIdx))}
+                          style={{ color: "var(--danger)", fontSize: "11px", background: "none", border: "none", cursor: "pointer" }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    <div style={{ fontSize: "12px", fontWeight: "600", textAlign: "right", color: "var(--muted-strong)" }}>
+                      Total Duration: {subtasks.reduce((sum, s) => sum + s.estimatedHours, 0).toFixed(1)}h
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "4px" }}>
+                  <input
+                    type="text"
+                    placeholder="New subtask title..."
+                    className="input"
+                    value={newSubtaskTitle}
+                    onChange={e => setNewSubtaskTitle(e.target.value)}
+                    style={{ height: "32px", fontSize: "12px", padding: "4px 8px" }}
+                  />
+                  <input
+                    type="number"
+                    min="0.25"
+                    step="0.25"
+                    className="input"
+                    value={newSubtaskHours}
+                    onChange={e => setNewSubtaskHours(Number(e.target.value))}
+                    style={{ width: "70px", height: "32px", fontSize: "12px", padding: "4px 8px" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newSubtaskTitle.trim()) return;
+                      setSubtasks(prev => [...prev, { title: newSubtaskTitle.trim(), estimatedHours: newSubtaskHours }]);
+                      setNewSubtaskTitle("");
+                      setNewSubtaskHours(0.5);
+                    }}
+                    className="button button-secondary"
+                    style={{ height: "32px", padding: "0 10px", fontSize: "12px", minHeight: "auto" }}
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>

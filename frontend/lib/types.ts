@@ -142,6 +142,9 @@ export interface Subtask {
   isCompleted: boolean;
   order: number;
   completedAt?: string;
+  startTime?: string;
+  endTime?: string;
+  calendarEventId?: string;
 }
 
 export interface RescueStrategy {

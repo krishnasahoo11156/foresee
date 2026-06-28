@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { useAuth } from "@/components/AuthProvider";
 import { collection, query, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { updateGoogleCalendarEvent } from "@/lib/googleCalendar";
+import { syncSubtasksAndCalendar } from "@/lib/calendarSyncEngine";
 import { 
   Calendar, 
   Clock, 
@@ -48,6 +50,7 @@ export default function PlannerPage() {
   
   // Real-time states
   const [dbTasks, setDbTasks] = useState<any[]>([]);
+  const [dbSubtasks, setDbSubtasks] = useState<any[]>([]);
   const [dbMappings, setDbMappings] = useState<any[]>([]);
   const [scheduleList, setScheduleList] = useState<ScheduleItem[]>([]);
   const [timelineLogs, setTimelineLogs] = useState<SyncLog[]>([]);
@@ -90,6 +93,22 @@ export default function PlannerPage() {
     return unsub;
   }, [user]);
 
+  // Subscribe to user subtasks in Firestore
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "users", user.uid, "subtasks"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items: any[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setDbSubtasks(items);
+    }, (err) => {
+      console.warn("Failed to load subtasks for planner:", err);
+    });
+    return unsub;
+  }, [user]);
+
   // Subscribe to user calendarMappings in Firestore
   useEffect(() => {
     if (!user) return;
@@ -106,22 +125,32 @@ export default function PlannerPage() {
     return unsub;
   }, [user]);
 
-  // Merge Firestore tasks into the Daily Schedule Flow timeline
+  // Merge Firestore subtasks into the Daily Schedule Flow timeline
   useEffect(() => {
-    // 1. Gather all tasks that have been scheduled
-    const scheduledTasks = dbTasks.filter(t => t.scheduledTime);
+    // 1. Gather all subtasks that have been scheduled (have startTime)
+    const scheduledSubtasks = dbSubtasks.filter(s => s.startTime);
     
-    if (scheduledTasks.length > 0) {
+    if (scheduledSubtasks.length > 0) {
       // Map to ScheduleItem format
-      const items: ScheduleItem[] = scheduledTasks.map(t => ({
-        id: t.id,
-        time: t.scheduledTime,
-        type: t.category ? t.category.charAt(0).toUpperCase() + t.category.slice(1) : "Focus block",
-        title: t.title,
-        isRescued: t.behaviorState === "slipping" || t.behaviorState === "rescued",
-        originalTime: t.originalTime || t.scheduledTime,
-        taskId: t.taskId || t.id
-      }));
+      const items: ScheduleItem[] = scheduledSubtasks.map(s => {
+        const parentTask = dbTasks.find(t => t.id === s.taskId || t.taskId === s.taskId);
+        const categoryLabel = parentTask?.category
+          ? parentTask.category.charAt(0).toUpperCase() + parentTask.category.slice(1)
+          : "Focus block";
+        
+        const start = new Date(s.startTime);
+        const formattedTime = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        
+        return {
+          id: s.id || s.subtaskId,
+          time: formattedTime,
+          type: categoryLabel,
+          title: parentTask ? `[${parentTask.title}] - ${s.title}` : s.title,
+          isRescued: parentTask?.behaviorState === "slipping" || parentTask?.behaviorState === "rescued",
+          originalTime: s.originalTime || formattedTime,
+          taskId: s.taskId
+        };
+      });
 
       // Sort chronologically
       items.sort((a, b) => a.time.localeCompare(b.time));
@@ -136,7 +165,16 @@ export default function PlannerPage() {
         { id: "s5", time: "19:00", type: "Demo", title: "Record walkthrough dry run", isRescued: false, originalTime: "19:00", taskId: "task_mock_5" }
       ]);
     }
-  }, [dbTasks]);
+  }, [dbSubtasks, dbTasks]);
+
+  // Trigger subtask bidirectional sync on mount
+  useEffect(() => {
+    if (user) {
+      syncSubtasksAndCalendar(user.uid).catch(err => {
+        console.warn("Auto-sync on load failed:", err);
+      });
+    }
+  }, [user]);
 
   // Construct Timeline Logs dynamically from Firestore calendarMappings
   useEffect(() => {
@@ -191,18 +229,75 @@ export default function PlannerPage() {
   const handleSaveMove = async (id: string) => {
     if (!user || !editTime.trim()) return;
 
-    // Check if the item is a real Firestore task or mock
+    // Check if the item is a real Firestore task/subtask or mock
     const targetItem = scheduleList.find(item => item.id === id);
     if (!targetItem) return;
 
     const logTime = getFormattedTime();
 
     try {
-      if (targetItem.taskId && !targetItem.taskId.startsWith("task_mock_")) {
-        // 1. Update the task time and deadline in Firestore tasks collection
-        const taskDocRef = doc(db, "users", user.uid, "tasks", id);
+      const subtask = dbSubtasks.find(s => s.id === id || s.subtaskId === id);
+      
+      if (subtask) {
+        // 1. Update subtask in Firestore
+        const subtaskDocRef = doc(db, "users", user.uid, "subtasks", subtask.id || subtask.subtaskId);
+        const start = new Date();
+        const [hoursStr, minutesStr] = editTime.split(":");
+        start.setHours(Number(hoursStr), Number(minutesStr), 0, 0);
         
-        // Calculate new deadline based on editTime
+        const duration = subtask.estimatedHours || 1.0;
+        const end = new Date(start.getTime() + duration * 3600 * 1000);
+
+        await updateDoc(subtaskDocRef, {
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+
+        // 2. Sync to Google Calendar
+        const token = localStorage.getItem(`google_calendar_token_${user.uid}`);
+        if (token && subtask.calendarEventId) {
+          try {
+            await updateGoogleCalendarEvent(token, subtask.calendarEventId, {
+              startTime: start.toISOString(),
+              endTime: end.toISOString()
+            });
+          } catch (calErr) {
+            console.warn("Failed to sync manual reschedule to Google Calendar:", calErr);
+          }
+        }
+
+        // 3. Add calendar log
+        await addDoc(collection(db, "users", user.uid, "calendarMappings"), {
+          mappingId: `map_${Date.now()}`,
+          syncTimestamp: new Date().toISOString(),
+          status: "synced",
+          action: "Manual Reschedule Sync",
+          source: "User Planner Drag",
+          description: `User manually rescheduled subtask focus block: "${subtask.title}"`,
+          changes: [
+            {
+              taskTitle: subtask.title,
+              before: targetItem.time,
+              after: editTime
+            }
+          ],
+          scheduledBlocks: [
+            {
+              title: subtask.title,
+              startTime: start.toISOString(),
+              endTime: end.toISOString(),
+              description: `Focus session. [ID: ${subtask.subtaskId}]`,
+              taskId: subtask.taskId
+            }
+          ],
+          createdAt: serverTimestamp()
+        });
+
+        triggerSync("Syncing manual reschedule to Google Calendar...");
+      } else if (targetItem.taskId && !targetItem.taskId.startsWith("task_mock_")) {
+        // Fallback: original task level update
+        const taskDocRef = doc(db, "users", user.uid, "tasks", targetItem.taskId);
         const newDeadlineDate = new Date();
         const [hours, minutes] = editTime.split(":");
         newDeadlineDate.setHours(Number(hours), Number(minutes), 0, 0);
@@ -214,7 +309,6 @@ export default function PlannerPage() {
           updatedAt: new Date().toISOString()
         });
 
-        // 2. Add a new sync log in Firestore calendarMappings
         await addDoc(collection(db, "users", user.uid, "calendarMappings"), {
           mappingId: `map_${Date.now()}`,
           syncTimestamp: new Date().toISOString(),
@@ -243,7 +337,7 @@ export default function PlannerPage() {
 
         triggerSync("Syncing manual reschedule to Google Calendar...");
       } else {
-        // Fallback for mock items if they aren't written to Firestore yet
+        // Fallback for mock items
         setScheduleList(prev => prev.map(item => {
           if (item.id === id) {
             return { ...item, time: editTime };
@@ -281,50 +375,55 @@ export default function PlannerPage() {
   const handleSimulateRescue = async () => {
     if (!user) return;
 
-    // Check if we have real tasks in Firestore to rescue
-    const rescueableTasks = dbTasks.filter(t => t.scheduledTime && (t.id === "s2" || t.id === "s3" || t.title.toLowerCase().includes("risk") || t.title.toLowerCase().includes("rescue")));
+    // Check if we have real subtasks in Firestore to rescue
+    const uncompletedSubtasks = dbSubtasks.filter(s => s.startTime && !s.isCompleted);
 
     const logTime = getFormattedTime();
 
     try {
-      if (rescueableTasks.length > 0) {
+      if (uncompletedSubtasks.length > 0) {
         const changesList: any[] = [];
         const blocksList: any[] = [];
+        const token = localStorage.getItem(`google_calendar_token_${user.uid}`);
 
-        // Shift real tasks in Firestore
-        for (const task of rescueableTasks) {
-          const taskDocRef = doc(db, "users", user.uid, "tasks", task.id);
-          const oldTime = task.scheduledTime;
-          let newTime = "";
-          let newDeadlineDate = new Date();
+        for (const subtask of uncompletedSubtasks) {
+          const subtaskDocRef = doc(db, "users", user.uid, "subtasks", subtask.id || subtask.subtaskId);
+          const oldStart = new Date(subtask.startTime);
+          const oldTimeStr = oldStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+          
+          const newStart = new Date(oldStart.getTime() + 2 * 3600 * 1000); // Shift by 2 hours
+          const newEnd = new Date(new Date(subtask.endTime).getTime() + 2 * 3600 * 1000);
+          const newTimeStr = newStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
-          if (task.title.toLowerCase().includes("risk") || task.id === "s2") {
-            newTime = "12:15";
-            newDeadlineDate.setHours(12, 15, 0, 0);
-          } else {
-            newTime = "15:30";
-            newDeadlineDate.setHours(15, 30, 0, 0);
-          }
-
-          await updateDoc(taskDocRef, {
-            scheduledTime: newTime,
-            deadline: newDeadlineDate.toISOString(),
-            behaviorState: "rescued",
+          await updateDoc(subtaskDocRef, {
+            startTime: newStart.toISOString(),
+            endTime: newEnd.toISOString(),
             updatedAt: new Date().toISOString()
           });
 
+          if (token && subtask.calendarEventId) {
+            try {
+              await updateGoogleCalendarEvent(token, subtask.calendarEventId, {
+                startTime: newStart.toISOString(),
+                endTime: newEnd.toISOString()
+              });
+            } catch (calErr) {
+              console.warn("Failed to sync simulated shift to Google Calendar:", calErr);
+            }
+          }
+
           changesList.push({
-            taskTitle: task.title,
-            before: oldTime,
-            after: newTime
+            taskTitle: subtask.title,
+            before: oldTimeStr,
+            after: newTimeStr
           });
 
           blocksList.push({
-            title: task.title,
-            startTime: newDeadlineDate.toISOString(),
-            endTime: new Date(newDeadlineDate.getTime() + 1.5 * 3600 * 1000).toISOString(),
-            description: `Rescued by AI Copilot. [ID: ${task.taskId || task.id}]`,
-            taskId: task.taskId || task.id
+            title: subtask.title,
+            startTime: newStart.toISOString(),
+            endTime: newEnd.toISOString(),
+            description: `Shifted by AI Rescue Planner. [Subtask ID: ${subtask.subtaskId}]`,
+            taskId: subtask.taskId
           });
         }
 
@@ -335,7 +434,7 @@ export default function PlannerPage() {
           status: "rescued",
           action: "Rescue Planner Intervention",
           source: "AI Co-Optimizer Graph",
-          description: "AI detected a 45-minute focus deficit. Auto-shifting schedule to maximize capacity.",
+          description: "AI shifted overlapping or non-important subtasks to resolve calendar conflicts.",
           changes: changesList,
           scheduledBlocks: blocksList,
           createdAt: serverTimestamp()
@@ -379,7 +478,7 @@ export default function PlannerPage() {
         triggerSync("AI Intervention: Re-optimizing Google Calendar schedule...");
       }
     } catch (err) {
-      console.error("Failed to execute simulated AI rescue:", err);
+      console.error("Failed to run AI Rescue simulation:", err);
     }
   };
 
@@ -570,7 +669,16 @@ export default function PlannerPage() {
                 <Sparkles size={14} style={{ color: "var(--danger)" }} /> Simulate Rescue
               </button>
               <button 
-                onClick={() => triggerSync("Synchronizing account blocks manually...")} 
+                onClick={async () => {
+                  triggerSync("Synchronizing account blocks manually...");
+                  try {
+                    if (user) {
+                      await syncSubtasksAndCalendar(user.uid);
+                    }
+                  } catch (err) {
+                    console.error("Failed to sync subtasks manually:", err);
+                  }
+                }} 
                 className="button button-secondary" 
                 style={{ height: "34px", width: "34px", display: "grid", placeItems: "center", padding: 0 }}
                 title="Trigger Manual Sync"

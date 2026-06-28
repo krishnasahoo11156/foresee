@@ -124,3 +124,77 @@ export async function syncEventsToGoogleCalendar(
     count: syncedCount
   };
 }
+
+/**
+ * Updates a single event on the user's primary Google Calendar via REST API PATCH request.
+ */
+export async function updateGoogleCalendarEvent(
+  accessToken: string,
+  eventId: string,
+  event: Partial<GoogleCalendarEvent>
+): Promise<any> {
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`;
+
+  const body: any = {};
+  if (event.summary !== undefined) body.summary = event.summary;
+  if (event.description !== undefined) body.description = event.description;
+  if (event.startTime !== undefined) {
+    body.start = {
+      dateTime: event.startTime,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+    };
+  }
+  if (event.endTime !== undefined) {
+    body.end = {
+      dateTime: event.endTime,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+    };
+  }
+
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const errorJson = await response.json().catch(() => null);
+    const errMsg = errorJson?.error?.message || `Google Calendar API PATCH Error: ${response.status}`;
+    const err = new Error(errMsg) as any;
+    err.status = response.status;
+    throw err;
+  }
+
+  return response.json();
+}
+
+/**
+ * Lists upcoming events from the user's primary Google Calendar.
+ */
+export async function listGoogleCalendarEvents(
+  accessToken: string,
+  timeMin: string
+): Promise<any[]> {
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(timeMin)}&singleEvents=true`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+
+  if (!response.ok) {
+    const errorJson = await response.json().catch(() => null);
+    const errMsg = errorJson?.error?.message || `Google Calendar API GET Error: ${response.status}`;
+    const err = new Error(errMsg) as any;
+    err.status = response.status;
+    throw err;
+  }
+
+  const data = await response.json();
+  return data.items || [];
+}

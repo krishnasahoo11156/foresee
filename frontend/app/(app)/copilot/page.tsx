@@ -22,6 +22,7 @@ export default function CopilotPage() {
   const { user, profile, signInWithGoogle } = useAuth();
   const [tasksList, setTasksList] = useState<Task[]>([]);
   const [calendarMappings, setCalendarMappings] = useState<any[]>([]);
+  const [subtasksList, setSubtasksList] = useState<any[]>([]);
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "copilot",
@@ -75,6 +76,22 @@ export default function CopilotPage() {
     return unsub;
   }, [user]);
 
+  // Subscribe to subtasks
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "users", user.uid, "subtasks"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items: any[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setSubtasksList(items);
+    }, (err) => {
+      console.warn("Failed to subscribe to subtasks list:", err);
+    });
+    return unsub;
+  }, [user]);
+
   // Load chat messages from localStorage on mount
   useEffect(() => {
     if (!user) return;
@@ -118,7 +135,7 @@ export default function CopilotPage() {
 
     try {
       // Call Gemini with full DB context
-      const response = await askCopilot(userMsg, tasksList, profile, calendarMappings);
+      const response = await askCopilot(userMsg, tasksList, profile, calendarMappings, subtasksList);
       
       setMessages(prev => [...prev, {
         sender: "copilot",

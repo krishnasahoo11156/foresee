@@ -5,13 +5,15 @@ import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, Play } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useAuth } from "@/components/AuthProvider";
-import { collection, query, onSnapshot } from "firebase/firestore";
+import { collection, query, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { calculateRiskAndClassification } from "@/lib/riskEngine";
+import { updateGoogleCalendarEvent } from "@/lib/googleCalendar";
 
 export default function TaskDetailPage({ params }: { params: { id: string } }) {
   const { user, profile } = useAuth();
   const [tasksList, setTasksList] = useState<any[]>([]);
+  const [subtasksList, setSubtasksList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Subscribe to all tasks to calculate sorted risk ranking
@@ -31,6 +33,26 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
     });
     return unsub;
   }, [user]);
+
+  // Subscribe to all subtasks for the task
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "users", user.uid, "subtasks"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items: any[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.taskId === params.id) {
+          items.push({ id: docSnap.id, ...data });
+        }
+      });
+      items.sort((a, b) => (a.order || 0) - (b.order || 0));
+      setSubtasksList(items);
+    }, (err) => {
+      console.warn("Failed to subscribe to subtasks:", err);
+    });
+    return unsub;
+  }, [user, params.id]);
 
   if (loading) {
     return (
@@ -86,9 +108,65 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
     );
   }
 
-  // Calculate detailed analysis using original task reference
+  // Calculate detailed analysis using original task reference and actual subtasks
   const originalTask = tasksList.find((item) => item.id === params.id || item.taskId === params.id);
-  const analysis = calculateRiskAndClassification(originalTask, tasksList, profile);
+  const analysis = calculateRiskAndClassification(originalTask, tasksList, profile, subtasksList);
+
+  const handleToggleSubtask = async (subtask: any) => {
+    if (!user || !originalTask) return;
+
+    const newStatus = !subtask.isCompleted;
+    const subtaskDocRef = doc(db, "users", user.uid, "subtasks", subtask.id || subtask.subtaskId);
+
+    try {
+      // 1. Update Subtask in Firestore
+      await updateDoc(subtaskDocRef, {
+        isCompleted: newStatus,
+        completedAt: newStatus ? new Date().toISOString() : null
+      });
+
+      // 2. Sync to Google Calendar if linked
+      const token = localStorage.getItem(`google_calendar_token_${user.uid}`);
+      if (token && subtask.calendarEventId) {
+        const cleanTitle = subtask.title.replace(/^✓\s*(Completed:\s*)?/, "").replace(/^\[Completed\]\s*/, "");
+        const newSummary = newStatus ? `✓ Completed: ${cleanTitle}` : cleanTitle;
+        try {
+          await updateGoogleCalendarEvent(token, subtask.calendarEventId, { summary: newSummary });
+        } catch (calErr) {
+          console.warn("Failed to sync completion to Google Calendar:", calErr);
+        }
+      }
+
+      // 3. Recalculate parent task progress & risk
+      const updatedSubtasks = subtasksList.map(s => 
+        s.subtaskId === subtask.subtaskId ? { ...s, isCompleted: newStatus } : s
+      );
+      const completedHours = updatedSubtasks.filter(s => s.isCompleted).reduce((sum, s) => sum + s.estimatedHours, 0);
+      const totalHours = updatedSubtasks.reduce((sum, s) => sum + s.estimatedHours, 0);
+      const newProgress = totalHours > 0 ? Math.min(100, Math.round((completedHours / totalHours) * 100)) : 0;
+
+      // Recalculate risk using updated progress
+      const updatedTaskObj = { ...originalTask, progress: newProgress };
+      const newAnalysis = calculateRiskAndClassification(updatedTaskObj, tasksList, profile, updatedSubtasks);
+
+      const taskDocRef = doc(db, "users", user.uid, "tasks", originalTask.id || originalTask.taskId);
+      await updateDoc(taskDocRef, {
+        progress: newProgress,
+        riskScore: newAnalysis.riskScore,
+        riskLevel: newAnalysis.riskLevel,
+        completionProbability: newAnalysis.completionProbability,
+        urgency: newAnalysis.urgency,
+        importance: newAnalysis.importance,
+        behaviorState: newAnalysis.behaviorState,
+        calendarState: newAnalysis.calendarState,
+        progressState: newAnalysis.progressState,
+        updatedAt: new Date().toISOString()
+      });
+
+    } catch (err) {
+      console.error("Failed to toggle subtask status:", err);
+    }
+  };
 
   // Blocker dependencies
   const dependencies = originalTask.dependencies || [];
@@ -191,48 +269,58 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
         <div className="card card-pad stack" style={{ padding: "28px" }}>
           <h2 style={{ margin: 0, fontSize: "18px" }}>Subtask Execution plan</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "12px" }}>
-            {[
-              ["Clarify output deliverables", "done"],
-              ["Schedule dedicated focus block", "done"],
-              ["Complete main narrative draft", "next"],
-              ["Review against scheduling rules and ship", "next"]
-            ].map(([item, status], index) => {
-              const isDone = status === "done";
-              return (
-                <div 
-                  className="list-row" 
-                  key={item} 
-                  style={{ 
-                    padding: "14px 20px", 
-                    margin: 0, 
-                    boxShadow: "none",
-                    opacity: isDone ? 0.7 : 1,
-                    background: isDone ? "var(--surface-soft)" : "var(--surface)"
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--muted)", minWidth: "20px" }}>
-                      0{index + 1}
-                    </span>
-                    <strong style={{ fontSize: "13.5px", fontWeight: isDone ? "500" : "600", textDecoration: isDone ? "line-through" : "none" }}>
-                      {item}
-                    </strong>
-                  </div>
-                  <span 
-                    className={`pill ${isDone ? "safe" : "default"}`} 
+            {subtasksList.length > 0 ? (
+              subtasksList.map((subtask, index) => {
+                const isDone = subtask.isCompleted;
+                return (
+                  <div 
+                    className="list-row" 
+                    key={subtask.id || subtask.subtaskId} 
                     style={{ 
-                      padding: "2px 8px", 
-                      fontSize: "9px",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px"
+                      padding: "14px 20px", 
+                      margin: 0, 
+                      boxShadow: "none",
+                      opacity: isDone ? 0.7 : 1,
+                      background: isDone ? "var(--surface-soft)" : "var(--surface)",
+                      cursor: "pointer"
                     }}
+                    onClick={() => handleToggleSubtask(subtask)}
                   >
-                    {isDone && <CheckCircle2 size={10} />} {status}
-                  </span>
-                </div>
-              );
-            })}
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <input 
+                        type="checkbox"
+                        checked={isDone}
+                        onChange={() => {}} 
+                        style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                      />
+                      <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--muted)", minWidth: "20px" }}>
+                        0{index + 1}
+                      </span>
+                      <strong style={{ fontSize: "13.5px", fontWeight: isDone ? "500" : "600", textDecoration: isDone ? "line-through" : "none" }}>
+                        {subtask.title}
+                      </strong>
+                      <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                        ({subtask.estimatedHours}h)
+                      </span>
+                    </div>
+                    <span 
+                      className={`pill ${isDone ? "safe" : "default"}`} 
+                      style={{ 
+                        padding: "2px 8px", 
+                        fontSize: "9px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px"
+                      }}
+                    >
+                      {isDone && <CheckCircle2 size={10} />} {isDone ? "completed" : "pending"}
+                    </span>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="muted" style={{ padding: "12px", border: "1px dashed var(--surface-line)", borderRadius: "8px", textAlign: "center" }}>No subtasks defined for this task.</p>
+            )}
           </div>
         </div>
 

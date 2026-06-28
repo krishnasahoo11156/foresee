@@ -10,7 +10,8 @@ import {
   CalendarState,
   DependencyState,
   ProgressState,
-  RescueStrategy
+  RescueStrategy,
+  Subtask
 } from "./types";
 
 /**
@@ -20,15 +21,39 @@ import {
 export function calculateRiskAndClassification(
   task: Task,
   allTasks: Task[],
-  profile: UserProfile | null
+  profile: UserProfile | null,
+  allSubtasks?: Subtask[]
 ) {
   const now = new Date();
   const deadline = new Date(task.deadline);
   
+  // Calculate dynamic progress and procrastination penalty from subtasks
+  let progress = task.progress || 0;
+  let missedPenalty = 0;
+  let calculatedHours = task.estimatedHours;
+
+  if (allSubtasks && allSubtasks.length > 0) {
+    const taskSubtasks = allSubtasks.filter(
+      (s) => s.taskId === task.id || s.taskId === task.taskId
+    );
+    if (taskSubtasks.length > 0) {
+      const completedHours = taskSubtasks
+        .filter((s) => s.isCompleted)
+        .reduce((sum, s) => sum + s.estimatedHours, 0);
+      calculatedHours = taskSubtasks.reduce((sum, s) => sum + s.estimatedHours, 0);
+      progress = calculatedHours > 0 ? Math.round((completedHours / calculatedHours) * 100) : 0;
+
+      // Procrastination penalty for uncompleted subtasks in the past
+      const missedSubtasks = taskSubtasks.filter(
+        (s) => !s.isCompleted && s.endTime && new Date(s.endTime).getTime() < now.getTime()
+      );
+      missedPenalty = Math.min(40, missedSubtasks.length * 15);
+    }
+  }
+
   // 1. Time calculations
   const t_rem = Math.max(0, (deadline.getTime() - now.getTime()) / (1000 * 60 * 60)); // remaining hours
-  const progress = task.progress || 0;
-  const E_rem = task.estimatedHours * (1 - progress / 100); // remaining effort needed
+  const E_rem = calculatedHours * (1 - progress / 100); // remaining effort needed
 
   // If completed
   if (progress >= 100) {
@@ -38,7 +63,7 @@ export function calculateRiskAndClassification(
       completionProbability: 100,
       urgency: "future" as UrgencyLevel,
       importance: "low" as ImportanceLevel,
-      difficulty: getDifficulty(task.estimatedHours),
+      difficulty: getDifficulty(calculatedHours),
       planningState: "fully_planned" as PlanningState,
       behaviorState: "on_track" as BehaviorState,
       calendarState: "scheduled" as CalendarState,
@@ -56,7 +81,7 @@ export function calculateRiskAndClassification(
       completionProbability: 0,
       urgency: "critical" as UrgencyLevel,
       importance: task.isImportant ? "mission_critical" as ImportanceLevel : "high" as ImportanceLevel,
-      difficulty: getDifficulty(task.estimatedHours),
+      difficulty: getDifficulty(calculatedHours),
       planningState: "partial" as PlanningState,
       behaviorState: "stalled" as BehaviorState,
       calendarState: "unscheduled" as CalendarState,
@@ -90,7 +115,7 @@ export function calculateRiskAndClassification(
   const procrastination = profile?.preferences?.procrastinationLevel !== undefined 
     ? Number(profile.preferences.procrastinationLevel) 
     : 2; // 1 - 5
-  const X_B = Math.min(100, Math.round((1 - reliability / 100) * 40 + procrastination * 12));
+  const X_B = Math.min(100, Math.round((1 - reliability / 100) * 40 + procrastination * 12) + missedPenalty);
 
   // Dependency Risk (X_D)
   let X_D = 0;
