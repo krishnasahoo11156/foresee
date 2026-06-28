@@ -133,23 +133,22 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 20px 12px 8px;
+  padding: 0 12px 8px;
   display: flex;
   flex-direction: column;
 }
 
-.sidebar.collapsed .sidebar-inner { padding: 20px 8px 8px; }
+.sidebar.collapsed .sidebar-inner { padding: 0 8px 8px; }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 4px 20px;
+  padding: 24px 4px 20px;
   font-weight: 700;
   font-size: 15px;
   letter-spacing: -0.02em;
   color: var(--text);
-  overflow: hidden;
 }
 
 .brand-mark {
@@ -171,7 +170,7 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
   transition: opacity var(--sidebar-transition), max-width var(--sidebar-transition);
 }
 
-.sidebar.collapsed .brand { justify-content: center; padding: 0 0 20px; }
+.sidebar.collapsed .brand { justify-content: center; padding: 24px 0 20px; }
 .sidebar.collapsed .brand-text { opacity: 0; max-width: 0; }
 
 .nav-group { display: grid; gap: 1px; margin-bottom: 20px; }
@@ -612,3 +611,45 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
   .page-header { flex-direction: column; gap: 16px; margin-bottom: 28px; }
   .marketing-links { display: none; }
 }
+
+/* Sidebar and Topbar Red Logout Buttons */
+.sidebar-home-link.logout-btn-red {
+  color: var(--danger);
+}
+.sidebar-home-link.logout-btn-red:hover {
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--danger);
+}
+
+.theme-switch-btn.logout-btn-red {
+  color: var(--danger);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+.theme-switch-btn.logout-btn-red:hover {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.button-red-landing {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: var(--danger);
+  background: transparent;
+  text-decoration: none;
+  transition: all var(--transition);
+}
+
+.button-red-landing:hover {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: var(--danger);
+  transform: translateY(-1px);
+}
+

@@ -61,7 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="avatar">{initials}</span>
               <span>{user?.displayName ?? user?.email ?? "ForeSee user"}</span>
             </a>
-            <button className="theme-switch-btn" onClick={signOut} aria-label="Sign out" title="Sign out">
+            <button className="theme-switch-btn logout-btn-red" onClick={signOut} aria-label="Sign out" title="Sign out">
               <LogOut size={16} />
             </button>
           </div>
