@@ -352,8 +352,8 @@ export default function OnboardingPage() {
                 </Link>
               </div>
               
-              <div style={{ textAlign: "center", marginTop: "12px", fontSize: "12.5px" }}>
-                <Link href="/" className="muted" style={{ textDecoration: "underline" }}>
+              <div style={{ textAlign: "center", marginTop: "16px" }}>
+                <Link href="/" className="button-red-landing" style={{ width: "100%" }}>
                   Go back to landing page
                 </Link>
               </div>

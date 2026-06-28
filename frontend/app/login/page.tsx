@@ -329,16 +329,16 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div style={{ textAlign: "center", marginTop: "16px", display: "flex", justifyContent: "space-between", fontSize: "12.5px" }}>
-            <div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px", alignItems: "center", marginTop: "24px" }}>
+            <Link href="/" className="button-red-landing" style={{ width: "100%" }}>
+              Go back to landing page
+            </Link>
+            <div style={{ fontSize: "13px", textAlign: "center" }}>
               <span className="muted">New to the website? </span>
               <Link href="/onboarding" style={{ textDecoration: "underline", color: "var(--accent)", fontWeight: 500 }}>
                 Sign up
               </Link>
             </div>
-            <Link href="/" className="muted" style={{ textDecoration: "underline" }}>
-              Go back to landing page
-            </Link>
           </div>
         </div>
       </div>
