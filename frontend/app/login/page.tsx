@@ -11,7 +11,7 @@ import { db } from "@/lib/firebase";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, signInWithGoogle, saveUserProfile } = useAuth();
+  const { user, signInWithGoogle, saveUserProfile, signOut } = useAuth();
   const [error, setError] = useState("");
   const [googleConnecting, setGoogleConnecting] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(Boolean(user));
@@ -44,6 +44,12 @@ export default function LoginPage() {
         }
       };
       fetchProfile();
+    } else {
+      setGoogleConnected(false);
+      setName("");
+      setUsername("");
+      setPassword("");
+      setStoredPassword("");
     }
   }, [user]);
 
@@ -69,6 +75,20 @@ export default function LoginPage() {
       setError(message);
     } finally {
       setGoogleConnecting(false);
+    }
+  };
+
+  const handleSwitchAccount = async () => {
+    try {
+      await signOut();
+      setGoogleConnected(false);
+      setName("");
+      setUsername("");
+      setPassword("");
+      setStoredPassword("");
+      setError("");
+    } catch (err) {
+      console.warn("Failed to switch Google account:", err);
     }
   };
 
@@ -201,9 +221,28 @@ export default function LoginPage() {
                   <span>{googleConnecting ? "Connecting..." : "Log in with Google"}</span>
                 </button>
               ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--success)", fontSize: "13px", fontWeight: 500, background: "var(--surface-soft)", padding: "10px 14px", borderRadius: "8px" }}>
-                  <CheckCircle size={16} />
-                  <span>Google Account connected!</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", background: "var(--surface-soft)", padding: "12px 14px", borderRadius: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--success)", fontSize: "13px", fontWeight: 500 }}>
+                    <CheckCircle size={16} />
+                    <span>Google Account connected!</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSwitchAccount}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      textDecoration: "underline",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      textAlign: "left",
+                      padding: 0,
+                      width: "fit-content"
+                    }}
+                  >
+                    Switch to a different account
+                  </button>
                 </div>
               )}
               {error && (
