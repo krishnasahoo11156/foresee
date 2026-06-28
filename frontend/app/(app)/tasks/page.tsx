@@ -5,6 +5,7 @@ import { Plus, TableProperties, X } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { TaskCard } from "@/components/ui/TaskCard";
 import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
+import { TimelineHeatmap } from "@/components/ui/TimelineHeatmap";
 import { useAuth } from "@/components/AuthProvider";
 import { collection, query, onSnapshot, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -212,7 +213,7 @@ export default function TasksPage() {
       </div>
 
       <div style={{ marginBottom: "32px" }}>
-        <ImagePlaceholder label="Timeline risk heat-map visualizer" height="200px" />
+        <TimelineHeatmap tasks={computedTasks} dailyCapacity={dailyCapacity} />
       </div>
 
       <div className="grid grid-3" style={{ marginBottom: "32px", gap: "24px" }}>
