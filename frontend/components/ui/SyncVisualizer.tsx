@@ -19,8 +19,37 @@ export function SyncVisualizer() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isSimulating, setIsSimulating] = useState(false);
   const [isAutoRunning, setIsAutoRunning] = useState(false);
+  const [isAutoMode, setIsAutoMode] = useState(true);
 
   const terminalBodyRef = useRef<HTMLDivElement | null>(null);
+  const isMountedRef = useRef(true);
+  const isAutoModeRef = useRef(true);
+
+  // Keep ref in sync
+  useEffect(() => {
+    isAutoModeRef.current = isAutoMode;
+    // If toggle is enabled, start run automatically if idle
+    if (isAutoMode && !isSimulating && !isAutoRunning) {
+      runAutoSequence();
+    }
+  }, [isAutoMode]);
+
+  // Handle mount and unmount tracking
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    // Auto start on page load
+    const startTimer = setTimeout(() => {
+      if (isMountedRef.current && isAutoModeRef.current) {
+        runAutoSequence();
+      }
+    }, 400);
+
+    return () => {
+      isMountedRef.current = false;
+      clearTimeout(startTimer);
+    };
+  }, []);
 
   // Theme-responsive container-only auto-scroll (avoids parent page scrolling/jumping/flickering)
   useEffect(() => {
@@ -85,6 +114,7 @@ export function SyncVisualizer() {
 
     let i = 0;
     const executeStep = () => {
+      if (!isMountedRef.current) return;
       if (i < steps.length) {
         const step = steps[i];
         setActiveNodes(step.nodes);
@@ -105,18 +135,52 @@ export function SyncVisualizer() {
   };
 
   const runAutoSequence = () => {
-    if (isSimulating || isAutoRunning) return;
+    if (isSimulating || isAutoRunning || !isMountedRef.current || !isAutoModeRef.current) {
+      return;
+    }
     setIsAutoRunning(true);
 
     // Sequence chain with brief delays in between for clear visual path transitions
     runSimulation("auth", () => {
+      if (!isMountedRef.current || !isAutoModeRef.current) {
+        setIsAutoRunning(false);
+        return;
+      }
       setTimeout(() => {
+        if (!isMountedRef.current || !isAutoModeRef.current) {
+          setIsAutoRunning(false);
+          return;
+        }
         runSimulation("firestore", () => {
+          if (!isMountedRef.current || !isAutoModeRef.current) {
+            setIsAutoRunning(false);
+            return;
+          }
           setTimeout(() => {
+            if (!isMountedRef.current || !isAutoModeRef.current) {
+              setIsAutoRunning(false);
+              return;
+            }
             runSimulation("calendar", () => {
+              if (!isMountedRef.current || !isAutoModeRef.current) {
+                setIsAutoRunning(false);
+                return;
+              }
               setTimeout(() => {
+                if (!isMountedRef.current || !isAutoModeRef.current) {
+                  setIsAutoRunning(false);
+                  return;
+                }
                 runSimulation("gemini", () => {
                   setIsAutoRunning(false);
+                  // Loop back to start by calling runAutoSequence again if loop is still enabled!
+                  if (isMountedRef.current && isAutoModeRef.current) {
+                    setTimeout(() => {
+                      if (isMountedRef.current && isAutoModeRef.current) {
+                        runAutoSequence();
+                      }
+                    }, 1400);
+                  }
                 });
               }, 1200);
             });
@@ -138,11 +202,11 @@ export function SyncVisualizer() {
             Select a pipeline to trigger mock GCP/Firebase data synchronization streams and logs.
           </p>
         </div>
-        <div className="sync-actions">
+        <div className="sync-actions" style={{ alignItems: "center" }}>
           <button 
             className={`sync-btn ${activeSim === "auth" ? "active" : ""}`}
             onClick={() => runSimulation("auth")}
-            disabled={isSimulating || isAutoRunning}
+            disabled={isSimulating || isAutoMode}
           >
             <Play size={10} />
             <span>OAuth Sync</span>
@@ -150,7 +214,7 @@ export function SyncVisualizer() {
           <button 
             className={`sync-btn ${activeSim === "firestore" ? "active" : ""}`}
             onClick={() => runSimulation("firestore")}
-            disabled={isSimulating || isAutoRunning}
+            disabled={isSimulating || isAutoMode}
           >
             <Play size={10} />
             <span>Firestore Write</span>
@@ -158,7 +222,7 @@ export function SyncVisualizer() {
           <button 
             className={`sync-btn ${activeSim === "calendar" ? "active" : ""}`}
             onClick={() => runSimulation("calendar")}
-            disabled={isSimulating || isAutoRunning}
+            disabled={isSimulating || isAutoMode}
           >
             <Play size={10} />
             <span>Calendar Push</span>
@@ -166,7 +230,7 @@ export function SyncVisualizer() {
           <button 
             className={`sync-btn ${activeSim === "gemini" ? "active" : ""}`}
             onClick={() => runSimulation("gemini")}
-            disabled={isSimulating || isAutoRunning}
+            disabled={isSimulating || isAutoMode}
           >
             <Play size={10} />
             <span>Gemini AI Parse</span>
@@ -174,15 +238,29 @@ export function SyncVisualizer() {
 
           <div style={{ width: "1px", height: "14px", background: "var(--surface-line)", margin: "0 4px" }}></div>
 
-          <button 
-            className={`sync-btn ${isAutoRunning ? "active" : ""}`}
-            onClick={() => runAutoSequence()}
-            disabled={isSimulating || isAutoRunning}
-            style={{ borderColor: "var(--accent)" }}
-          >
-            <RefreshCw size={10} className={isAutoRunning ? "animate-spin" : ""} />
-            <span>Auto Pipeline</span>
-          </button>
+          {isAutoMode ? (
+            <button 
+              className="sync-btn active"
+              onClick={() => setIsAutoMode(false)}
+              style={{ borderColor: "var(--warning)" }}
+            >
+              <span className="relative flex h-2 w-2 mr-1">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              <span>Pause Loop</span>
+            </button>
+          ) : (
+            <button 
+              className="sync-btn"
+              onClick={() => setIsAutoMode(true)}
+              disabled={isSimulating}
+              style={{ borderColor: "var(--accent)" }}
+            >
+              <Play size={10} style={{ color: "var(--accent)" }} />
+              <span>Resume Loop</span>
+            </button>
+          )}
         </div>
       </div>
 
