@@ -18,13 +18,44 @@ export function SyncVisualizer() {
   const [activeLines, setActiveLines] = useState<string[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [isAutoRunning, setIsAutoRunning] = useState(false);
+  const [isAutoMode, setIsAutoMode] = useState(true);
 
-  const terminalEndRef = useRef<HTMLDivElement | null>(null);
+  const terminalBodyRef = useRef<HTMLDivElement | null>(null);
+  const isMountedRef = useRef(true);
+  const isAutoModeRef = useRef(true);
 
-  // Auto-scroll terminal log
+  // Keep ref in sync
   useEffect(() => {
-    if (terminalEndRef.current) {
-      terminalEndRef.current.scrollIntoView({ behavior: "smooth" });
+    isAutoModeRef.current = isAutoMode;
+    // If toggle is enabled, start run automatically if idle
+    if (isAutoMode && !isSimulating && !isAutoRunning) {
+      runAutoSequence();
+    }
+  }, [isAutoMode]);
+
+  // Handle mount and unmount tracking
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    // Auto start on page load
+    const startTimer = setTimeout(() => {
+      if (isMountedRef.current && isAutoModeRef.current) {
+        runAutoSequence();
+      }
+    }, 400);
+
+    return () => {
+      isMountedRef.current = false;
+      clearTimeout(startTimer);
+    };
+  }, []);
+
+  // Theme-responsive container-only auto-scroll (avoids parent page scrolling/jumping/flickering)
+  useEffect(() => {
+    const body = terminalBodyRef.current;
+    if (body) {
+      body.scrollTop = body.scrollHeight;
     }
   }, [logs]);
 
@@ -37,7 +68,7 @@ export function SyncVisualizer() {
     return `[${hrs}:${mins}:${secs}.${ms}]`;
   };
 
-  const runSimulation = (simType: string) => {
+  const runSimulation = (simType: string, onComplete?: () => void) => {
     if (isSimulating) return;
     setIsSimulating(true);
     setActiveSim(simType);
@@ -83,6 +114,7 @@ export function SyncVisualizer() {
 
     let i = 0;
     const executeStep = () => {
+      if (!isMountedRef.current) return;
       if (i < steps.length) {
         const step = steps[i];
         setActiveNodes(step.nodes);
@@ -93,10 +125,69 @@ export function SyncVisualizer() {
       } else {
         setIsSimulating(false);
         setActiveSim(null);
+        if (onComplete) {
+          onComplete();
+        }
       }
     };
 
     executeStep();
+  };
+
+  const runAutoSequence = () => {
+    if (isSimulating || isAutoRunning || !isMountedRef.current || !isAutoModeRef.current) {
+      return;
+    }
+    setIsAutoRunning(true);
+
+    // Sequence chain with brief delays in between for clear visual path transitions
+    runSimulation("auth", () => {
+      if (!isMountedRef.current || !isAutoModeRef.current) {
+        setIsAutoRunning(false);
+        return;
+      }
+      setTimeout(() => {
+        if (!isMountedRef.current || !isAutoModeRef.current) {
+          setIsAutoRunning(false);
+          return;
+        }
+        runSimulation("firestore", () => {
+          if (!isMountedRef.current || !isAutoModeRef.current) {
+            setIsAutoRunning(false);
+            return;
+          }
+          setTimeout(() => {
+            if (!isMountedRef.current || !isAutoModeRef.current) {
+              setIsAutoRunning(false);
+              return;
+            }
+            runSimulation("calendar", () => {
+              if (!isMountedRef.current || !isAutoModeRef.current) {
+                setIsAutoRunning(false);
+                return;
+              }
+              setTimeout(() => {
+                if (!isMountedRef.current || !isAutoModeRef.current) {
+                  setIsAutoRunning(false);
+                  return;
+                }
+                runSimulation("gemini", () => {
+                  setIsAutoRunning(false);
+                  // Loop back to start by calling runAutoSequence again if loop is still enabled!
+                  if (isMountedRef.current && isAutoModeRef.current) {
+                    setTimeout(() => {
+                      if (isMountedRef.current && isAutoModeRef.current) {
+                        runAutoSequence();
+                      }
+                    }, 1400);
+                  }
+                });
+              }, 1200);
+            });
+          }, 1200);
+        });
+      }, 1200);
+    });
   };
 
   const isNodeActive = (id: string) => activeNodes.includes(id);
@@ -111,11 +202,11 @@ export function SyncVisualizer() {
             Select a pipeline to trigger mock GCP/Firebase data synchronization streams and logs.
           </p>
         </div>
-        <div className="sync-actions">
+        <div className="sync-actions" style={{ alignItems: "center" }}>
           <button 
             className={`sync-btn ${activeSim === "auth" ? "active" : ""}`}
             onClick={() => runSimulation("auth")}
-            disabled={isSimulating}
+            disabled={isSimulating || isAutoMode}
           >
             <Play size={10} />
             <span>OAuth Sync</span>
@@ -123,7 +214,7 @@ export function SyncVisualizer() {
           <button 
             className={`sync-btn ${activeSim === "firestore" ? "active" : ""}`}
             onClick={() => runSimulation("firestore")}
-            disabled={isSimulating}
+            disabled={isSimulating || isAutoMode}
           >
             <Play size={10} />
             <span>Firestore Write</span>
@@ -131,7 +222,7 @@ export function SyncVisualizer() {
           <button 
             className={`sync-btn ${activeSim === "calendar" ? "active" : ""}`}
             onClick={() => runSimulation("calendar")}
-            disabled={isSimulating}
+            disabled={isSimulating || isAutoMode}
           >
             <Play size={10} />
             <span>Calendar Push</span>
@@ -139,11 +230,37 @@ export function SyncVisualizer() {
           <button 
             className={`sync-btn ${activeSim === "gemini" ? "active" : ""}`}
             onClick={() => runSimulation("gemini")}
-            disabled={isSimulating}
+            disabled={isSimulating || isAutoMode}
           >
             <Play size={10} />
             <span>Gemini AI Parse</span>
           </button>
+
+          <div style={{ width: "1px", height: "14px", background: "var(--surface-line)", margin: "0 4px" }}></div>
+
+          {isAutoMode ? (
+            <button 
+              className="sync-btn active"
+              onClick={() => setIsAutoMode(false)}
+              style={{ borderColor: "var(--warning)" }}
+            >
+              <span className="relative flex h-2 w-2 mr-1">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              <span>Pause Loop</span>
+            </button>
+          ) : (
+            <button 
+              className="sync-btn"
+              onClick={() => setIsAutoMode(true)}
+              disabled={isSimulating}
+              style={{ borderColor: "var(--accent)" }}
+            >
+              <Play size={10} style={{ color: "var(--accent)" }} />
+              <span>Resume Loop</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -268,9 +385,9 @@ export function SyncVisualizer() {
           <span className="terminal-title">Infrastructure Event Logger</span>
           <span style={{ width: "38px" }}></span>
         </div>
-        <div className="terminal-body">
+        <div className="terminal-body" ref={terminalBodyRef}>
           {logs.length === 0 ? (
-            <div className="terminal-log-row" style={{ color: "#64748b" }}>
+            <div className="terminal-log-row" style={{ color: "var(--muted)" }}>
               <span>[00:00:00.00]</span>
               <span>System idling. Propose sync simulation to begin routing data.</span>
             </div>
@@ -284,7 +401,6 @@ export function SyncVisualizer() {
               </div>
             ))
           )}
-          <div ref={terminalEndRef}></div>
         </div>
       </div>
     </div>
