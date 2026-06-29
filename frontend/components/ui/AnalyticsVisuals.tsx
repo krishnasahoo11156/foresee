@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   TrendingUp, Calendar, AlertTriangle, Info, Clock, 
   Activity, ArrowRight, ShieldCheck, RefreshCw 
@@ -38,6 +38,7 @@ export function AnalyticsVisuals({ tasks, profile }: AnalyticsVisualsProps) {
   const [activeTab, setActiveTab] = useState<"trajectory" | "heatmap" | "risk">("trajectory");
   const [hoveredVector, setHoveredVector] = useState<number | null>(0); // Default to first item
   const [hoveredCell, setHoveredCell] = useState<{ day: number; time: number } | null>({ day: 1, time: 3 }); // Default cell
+  const [isAutoCycling, setIsAutoCycling] = useState(true);
 
   // 1. Vector Trajectory Data definition
   const vectors: VectorItem[] = useMemo(() => [
@@ -198,6 +199,18 @@ export function AnalyticsVisuals({ tasks, profile }: AnalyticsVisualsProps) {
 
   const activeVectorData = hoveredVector !== null ? vectors[hoveredVector] : null;
 
+  // Auto-cycling for delay vectors in trajectory tab
+  useEffect(() => {
+    if (!isAutoCycling || activeTab !== "trajectory") return;
+    const interval = setInterval(() => {
+      setHoveredVector((prev) => {
+        if (prev === null) return 0;
+        return (prev + 1) % vectors.length;
+      });
+    }, 2000); // Cycle every 2 seconds
+    return () => clearInterval(interval);
+  }, [isAutoCycling, activeTab, vectors.length]);
+
   const activeCellData = useMemo(() => {
     if (!hoveredCell) return null;
     return heatmapMatrix[hoveredCell.day][hoveredCell.time];
@@ -241,7 +254,12 @@ export function AnalyticsVisuals({ tasks, profile }: AnalyticsVisualsProps) {
           
           {/* TAB 1: DELAY VECTOR TRAJECTORY */}
           {activeTab === "trajectory" && (
-            <svg viewBox="0 0 760 220" className="seq-canvas">
+            <svg 
+              viewBox="0 0 760 220" 
+              className="seq-canvas"
+              onMouseEnter={() => setIsAutoCycling(false)}
+              onMouseLeave={() => setIsAutoCycling(true)}
+            >
               {/* Definitions */}
               <defs>
                 <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
