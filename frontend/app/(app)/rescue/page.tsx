@@ -47,19 +47,24 @@ export default function RescuePage() {
     }
   }, [user]);
 
+  // Identify active tasks
+  const activeTasks = tasksList.filter(t => t.progress < 100);
+
   // Identify critical or danger tasks
-  const rescueCandidates = tasksList.filter(t => {
-    if (t.progress >= 100) return false;
-    const analysis = calculateRiskAndClassification(t, tasksList, profile);
+  const rescueCandidates = activeTasks.filter(t => {
+    const analysis = calculateRiskAndClassification(t, activeTasks, profile);
     return analysis.riskLevel === "critical" || analysis.riskLevel === "danger";
   });
 
+  // The list of tasks we can display selectors for (falls back to active tasks for simulation/demo if none are critical)
+  const availableTasks = rescueCandidates.length > 0 ? rescueCandidates : activeTasks;
+
   // Set default selection
   useEffect(() => {
-    if (rescueCandidates.length > 0 && !selectedTaskId) {
-      setSelectedTaskId(rescueCandidates[0].id || rescueCandidates[0].taskId);
+    if (availableTasks.length > 0 && !selectedTaskId) {
+      setSelectedTaskId(availableTasks[0].id || availableTasks[0].taskId);
     }
-  }, [rescueCandidates, selectedTaskId]);
+  }, [availableTasks, selectedTaskId]);
 
   if (loading) {
     return (
@@ -259,25 +264,34 @@ export default function RescuePage() {
         </div>
       )}
 
-      {rescueCandidates.length === 0 ? (
+      {rescueCandidates.length === 0 && availableTasks.length > 0 && (
+        <div className="card card-pad" style={{ background: "rgba(34, 197, 94, 0.06)", border: "1px solid rgba(34, 197, 94, 0.18)", color: "var(--text)", padding: "14px 20px", borderRadius: "10px", marginBottom: "28px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <CheckCircle2 size={18} style={{ color: "var(--success)" }} />
+            <span style={{ fontSize: "13.5px" }}><strong>Timeline Safe:</strong> All tasks are currently on track. You can simulate AI optimization strategies on any active task below.</span>
+          </div>
+        </div>
+      )}
+
+      {availableTasks.length === 0 ? (
         <div className="card card-pad" style={{ padding: "64px", textAlign: "center", border: "1px dashed var(--surface-line)", borderRadius: "16px" }}>
           <div style={{ background: "var(--accent-soft)", width: "54px", height: "54px", borderRadius: "50%", display: "grid", placeItems: "center", margin: "0 auto 20px", color: "var(--accent)" }}>
             <Sparkles size={24} />
           </div>
-          <h2 style={{ fontSize: "20px", marginBottom: "8px" }}>Your Timeline is Safe</h2>
+          <h2 style={{ fontSize: "20px", marginBottom: "8px" }}>No Active Tasks Found</h2>
           <p className="muted" style={{ maxWidth: "460px", margin: "0 auto 24px" }}>
-            The deadline rescue watchdogs have scanned your task queue and calendar commitments. No tasks currently exceed safety risk levels.
+            Your task list is empty. Go to the tasks page to add tasks and start scheduling focus windows!
           </p>
-          <Link href="/tasks" className="button button-secondary">
-            View active tasks list
+          <Link href="/tasks?new=true" className="button button-primary">
+            Add your first task
           </Link>
         </div>
       ) : (
         <div className="stack" style={{ gap: "24px" }}>
-          {/* Selector if multiple tasks need rescue */}
-          {rescueCandidates.length > 1 && (
+          {/* Selector if multiple tasks are available */}
+          {availableTasks.length > 1 && (
             <div className="card card-pad" style={{ padding: "18px 24px", display: "flex", alignItems: "center", gap: "16px" }}>
-              <strong style={{ fontSize: "14px", color: "var(--muted-strong)" }}>Select task to resolve:</strong>
+              <strong style={{ fontSize: "14px", color: "var(--muted-strong)" }}>Select task to optimize:</strong>
               <select 
                 className="select" 
                 style={{ maxWidth: "320px" }}
@@ -287,7 +301,7 @@ export default function RescuePage() {
                   setSuccessMessage("");
                 }}
               >
-                {rescueCandidates.map(c => (
+                {availableTasks.map(c => (
                   <option key={c.id || c.taskId} value={c.id || c.taskId}>{c.title}</option>
                 ))}
               </select>
