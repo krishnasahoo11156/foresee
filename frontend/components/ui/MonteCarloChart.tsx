@@ -29,9 +29,22 @@ export function MonteCarloChart({ uncertainty, setUncertainty, buffer, setBuffer
   const [isSimulating, setIsSimulating] = useState(false);
   const [trialCount, setTrialCount] = useState(1000);
   const [currentTrial, setCurrentTrial] = useState(1000);
+  const [scanProgress, setScanProgress] = useState(1); // 0 to 1
   
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationRef = useRef<number | null>(null);
+
+  // Reset and clear canvas on parameter adjustments
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+    setScanProgress(1);
+  }, [uncertainty, buffer]);
 
   // Time bins: 15 columns representing completion days relative to deadline (Day 0)
   const relativeDays = ["-4", "-3", "-2", "-1", "0", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10"];
@@ -99,6 +112,7 @@ export function MonteCarloChart({ uncertainty, setUncertainty, buffer, setBuffer
     if (isSimulating) return;
     setIsSimulating(true);
     setCurrentTrial(0);
+    setScanProgress(0);
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -110,13 +124,14 @@ export function MonteCarloChart({ uncertainty, setUncertainty, buffer, setBuffer
     canvas.width = rect.width;
     canvas.height = rect.height;
 
-    let particles: Particle[] = [];
-    let trialIndex = 0;
-    const maxTrials = 1000;
-    const duration = 2400; // 2.4s simulation length
-    const start = performance.now();
+    const scaleX = canvas.width / 800;
+    const scaleY = canvas.height / 220;
+    const startX = 60 * scaleX;
+    const endWidthX = 644 * scaleX;
 
-    const colors = ["#3b82f6", "#60a5fa", "#8b5cf6", "#ec4899", "#2563eb"];
+    const maxTrials = 1000;
+    const duration = 1600; // 1.6s scan duration
+    const start = performance.now();
 
     const animate = (now: number) => {
       const elapsed = now - start;
@@ -129,77 +144,31 @@ export function MonteCarloChart({ uncertainty, setUncertainty, buffer, setBuffer
       const activeTrials = Math.floor(progressRatio * maxTrials);
       setCurrentTrial(activeTrials);
 
-      // 1. Emit new trial particles
-      const particlesToEmit = Math.floor((maxTrials / (duration / 16.6)) * 1.5);
-      if (trialIndex < maxTrials && progressRatio < 0.9) {
-        for (let k = 0; k < particlesToEmit; k++) {
-          if (trialIndex >= maxTrials) break;
+      // Update scan progress
+      setScanProgress(progressRatio);
 
-          // Inverse Transform Sampling: Pick target day based on CDF distribution
-          const rand = Math.random() * 100;
-          let targetDayIdx = 0;
-          for (let j = 0; j < stats.cdf.length; j++) {
-            if (rand <= stats.cdf[j]) {
-              targetDayIdx = j;
-              break;
-            }
-          }
+      // Draw single vertical scanning line
+      const scannerX = startX + progressRatio * endWidthX;
+      
+      ctx.beginPath();
+      ctx.moveTo(scannerX, 15 * scaleY);
+      ctx.lineTo(scannerX, 205 * scaleY);
+      ctx.strokeStyle = "rgba(59, 130, 246, 0.85)";
+      ctx.lineWidth = 2 * scaleX;
+      
+      // Subtle horizontal gradient glow on the line
+      ctx.shadowColor = "rgba(59, 130, 246, 0.6)";
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0; // Reset shadow
 
-          // Map relative positions inside canvas size
-          const targetX = (xCoords[targetDayIdx] / 800) * canvas.width;
-          // Calculate Target Y based on PDF height
-          const barHeightVal = stats.pdf[targetDayIdx];
-          const targetYVal = 200 - (barHeightVal / 100) * 450; // Map SVG coord to canvas height
-          const targetY = (targetYVal / 250) * canvas.height;
-
-          particles.push({
-            x: 0, // Emit from left side (agent node)
-            y: canvas.height / 2 + (Math.random() * 40 - 20),
-            targetX,
-            targetY,
-            speed: 0.02 + Math.random() * 0.03,
-            color: colors[Math.floor(Math.random() * colors.length)],
-            size: 2 + Math.random() * 3,
-            progress: 0,
-          });
-
-          trialIndex++;
-        }
-      }
-
-      // 2. Update and draw active particles
-      particles = particles.filter((p) => {
-        p.progress += p.speed;
-        if (p.progress >= 1) {
-          // Sparkle explosion when landing
-          ctx.beginPath();
-          ctx.arc(p.targetX, p.targetY, p.size * 2, 0, 2 * Math.PI);
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = 0.3;
-          ctx.fill();
-          return false; // Remove particle
-        }
-
-        // Quadratic ease out path towards target
-        const t = p.progress;
-        const currentX = p.x + (p.targetX - p.x) * t;
-        // Wavy parabolic path
-        const currentY = p.y + (p.targetY - p.y) * t - Math.sin(t * Math.PI) * 40;
-
-        ctx.beginPath();
-        ctx.arc(currentX, currentY, p.size, 0, 2 * Math.PI);
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = 0.8;
-        ctx.fill();
-
-        return true;
-      });
-
-      if (progressRatio < 1 || particles.length > 0) {
+      if (progressRatio < 1) {
         animationRef.current = requestAnimationFrame(animate);
       } else {
         setIsSimulating(false);
         setCurrentTrial(1000);
+        setScanProgress(1);
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear laser scanner when finished
       }
     };
 
@@ -357,7 +326,8 @@ export function MonteCarloChart({ uncertainty, setUncertainty, buffer, setBuffer
           {stats.pdf.map((val, idx) => {
             const x = xCoords[idx];
             // Normalize height mapping
-            const barHeight = (val / 100) * 450;
+            const colProgress = Math.min(1, Math.max(0, (scanProgress - (idx / 14)) * 5));
+            const barHeight = (val / 100) * 450 * colProgress;
             const y = 200 - barHeight;
             const isDeadlineDay = idx === 4; // Day 0 is deadline
 
