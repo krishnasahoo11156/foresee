@@ -18,13 +18,15 @@ export function SyncVisualizer() {
   const [activeLines, setActiveLines] = useState<string[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [isAutoRunning, setIsAutoRunning] = useState(false);
 
-  const terminalEndRef = useRef<HTMLDivElement | null>(null);
+  const terminalBodyRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll terminal log
+  // Theme-responsive container-only auto-scroll (avoids parent page scrolling/jumping/flickering)
   useEffect(() => {
-    if (terminalEndRef.current) {
-      terminalEndRef.current.scrollIntoView({ behavior: "smooth" });
+    const body = terminalBodyRef.current;
+    if (body) {
+      body.scrollTop = body.scrollHeight;
     }
   }, [logs]);
 
@@ -37,7 +39,7 @@ export function SyncVisualizer() {
     return `[${hrs}:${mins}:${secs}.${ms}]`;
   };
 
-  const runSimulation = (simType: string) => {
+  const runSimulation = (simType: string, onComplete?: () => void) => {
     if (isSimulating) return;
     setIsSimulating(true);
     setActiveSim(simType);
@@ -93,10 +95,35 @@ export function SyncVisualizer() {
       } else {
         setIsSimulating(false);
         setActiveSim(null);
+        if (onComplete) {
+          onComplete();
+        }
       }
     };
 
     executeStep();
+  };
+
+  const runAutoSequence = () => {
+    if (isSimulating || isAutoRunning) return;
+    setIsAutoRunning(true);
+
+    // Sequence chain with brief delays in between for clear visual path transitions
+    runSimulation("auth", () => {
+      setTimeout(() => {
+        runSimulation("firestore", () => {
+          setTimeout(() => {
+            runSimulation("calendar", () => {
+              setTimeout(() => {
+                runSimulation("gemini", () => {
+                  setIsAutoRunning(false);
+                });
+              }, 1200);
+            });
+          }, 1200);
+        });
+      }, 1200);
+    });
   };
 
   const isNodeActive = (id: string) => activeNodes.includes(id);
@@ -115,7 +142,7 @@ export function SyncVisualizer() {
           <button 
             className={`sync-btn ${activeSim === "auth" ? "active" : ""}`}
             onClick={() => runSimulation("auth")}
-            disabled={isSimulating}
+            disabled={isSimulating || isAutoRunning}
           >
             <Play size={10} />
             <span>OAuth Sync</span>
@@ -123,7 +150,7 @@ export function SyncVisualizer() {
           <button 
             className={`sync-btn ${activeSim === "firestore" ? "active" : ""}`}
             onClick={() => runSimulation("firestore")}
-            disabled={isSimulating}
+            disabled={isSimulating || isAutoRunning}
           >
             <Play size={10} />
             <span>Firestore Write</span>
@@ -131,7 +158,7 @@ export function SyncVisualizer() {
           <button 
             className={`sync-btn ${activeSim === "calendar" ? "active" : ""}`}
             onClick={() => runSimulation("calendar")}
-            disabled={isSimulating}
+            disabled={isSimulating || isAutoRunning}
           >
             <Play size={10} />
             <span>Calendar Push</span>
@@ -139,10 +166,22 @@ export function SyncVisualizer() {
           <button 
             className={`sync-btn ${activeSim === "gemini" ? "active" : ""}`}
             onClick={() => runSimulation("gemini")}
-            disabled={isSimulating}
+            disabled={isSimulating || isAutoRunning}
           >
             <Play size={10} />
             <span>Gemini AI Parse</span>
+          </button>
+
+          <div style={{ width: "1px", height: "14px", background: "var(--surface-line)", margin: "0 4px" }}></div>
+
+          <button 
+            className={`sync-btn ${isAutoRunning ? "active" : ""}`}
+            onClick={() => runAutoSequence()}
+            disabled={isSimulating || isAutoRunning}
+            style={{ borderColor: "var(--accent)" }}
+          >
+            <RefreshCw size={10} className={isAutoRunning ? "animate-spin" : ""} />
+            <span>Auto Pipeline</span>
           </button>
         </div>
       </div>
@@ -268,9 +307,9 @@ export function SyncVisualizer() {
           <span className="terminal-title">Infrastructure Event Logger</span>
           <span style={{ width: "38px" }}></span>
         </div>
-        <div className="terminal-body">
+        <div className="terminal-body" ref={terminalBodyRef}>
           {logs.length === 0 ? (
-            <div className="terminal-log-row" style={{ color: "#64748b" }}>
+            <div className="terminal-log-row" style={{ color: "var(--muted)" }}>
               <span>[00:00:00.00]</span>
               <span>System idling. Propose sync simulation to begin routing data.</span>
             </div>
@@ -284,7 +323,6 @@ export function SyncVisualizer() {
               </div>
             ))
           )}
-          <div ref={terminalEndRef}></div>
         </div>
       </div>
     </div>

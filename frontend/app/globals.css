@@ -1823,9 +1823,9 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
 
 /* Terminal Mock Console */
 .sync-terminal {
-  background: #0f172a;
+  background: var(--surface-soft);
   border-radius: var(--radius);
-  border: 1px solid #1e293b;
+  border: 1px solid var(--surface-line);
   overflow: hidden;
   box-shadow: var(--shadow-lg);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -1835,12 +1835,12 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
 }
 
 .terminal-bar {
-  background: #1e293b;
+  background: var(--surface-line);
   padding: 6px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--surface-line);
 }
 
 .terminal-dots {
@@ -1859,7 +1859,7 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
 .dot-green { background: #10b981; }
 
 .terminal-title {
-  color: #94a3b8;
+  color: var(--muted-strong);
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -1878,13 +1878,13 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
 .terminal-log-row {
   font-size: 11px;
   line-height: 1.4;
-  color: #38bdf8;
+  color: var(--text);
   display: flex;
   gap: 8px;
 }
 
 .log-time {
-  color: #64748b;
+  color: var(--muted);
   flex-shrink: 0;
   user-select: none;
 }
