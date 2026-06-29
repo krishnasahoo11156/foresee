@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { Brand } from "@/components/layout/Sidebar";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -164,7 +165,7 @@ export default function OnboardingPage() {
       <div className="onboarding-form-col">
         <div style={{ maxWidth: "440px", width: "100%", margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
-            <span className="eyebrow" style={{ margin: 0 }}>Onboarding</span>
+            <Brand />
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <button 
                 type="button"
