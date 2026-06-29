@@ -22,9 +22,23 @@ export default function RescuePage() {
   const [hasCalendarToken, setHasCalendarToken] = useState(false);
   const [apiActivationUrl, setApiActivationUrl] = useState("");
 
-  // Subscribe to tasks
+  // Subscribe to user tasks (LocalStorage if Guest)
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalTasks = () => {
+        const stored = localStorage.getItem("foresee-guest-tasks");
+        return stored ? JSON.parse(stored) : [];
+      };
+      setTasksList(getLocalTasks());
+      const handleStorage = () => {
+        setTasksList(JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      setLoading(false);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "tasks"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: Task[] = [];
@@ -94,6 +108,57 @@ export default function RescuePage() {
 
     try {
       const chosenStrategy = strategies.find(s => s.name === selectedStrategyName) || strategies[0];
+
+      if (user.uid === "guest-user-id") {
+        // 1. Update task locally
+        const storedTasks = JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]");
+        const updatedTasks = storedTasks.map((t: any) => {
+          if (t.id === activeTask.id || t.taskId === activeTask.id) {
+            return {
+              ...t,
+              riskScore: Math.round(t.riskScore * 0.5),
+              riskLevel: "monitor",
+              behaviorState: "recovering",
+              rescueCount: (t.rescueCount || 0) + 1,
+              updatedAt: new Date().toISOString()
+            };
+          }
+          return t;
+        });
+        localStorage.setItem("foresee-guest-tasks", JSON.stringify(updatedTasks));
+
+        // 2. Add calendar sync mappings
+        const storedMappings = JSON.parse(localStorage.getItem("foresee-guest-mappings") || "[]");
+        const newMapping = {
+          mappingId: `map_${Date.now()}`,
+          taskId: activeTask.id || activeTask.taskId,
+          scheduledBlocks: chosenStrategy.dailyWorkSchedule,
+          syncTimestamp: new Date().toISOString(),
+          status: "synced",
+          source: "Rescue Engine"
+        };
+        localStorage.setItem("foresee-guest-mappings", JSON.stringify([newMapping, ...storedMappings]));
+
+        // 3. Save subtasks for this rescue plan
+        const storedSubtasks = JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]");
+        const newSubtasks = chosenStrategy.dailyWorkSchedule.map((block: any, idx: number) => ({
+          id: `subtask_rescue_${Date.now()}_${idx}`,
+          subtaskId: `subtask_rescue_${Date.now()}_${idx}`,
+          taskId: activeTask.id || activeTask.taskId,
+          title: block.title,
+          estimatedHours: 2.0, // Default duration
+          isCompleted: false,
+          startTime: block.startTime,
+          endTime: block.endTime
+        }));
+        localStorage.setItem("foresee-guest-subtasks", JSON.stringify([...storedSubtasks, ...newSubtasks]));
+
+        window.dispatchEvent(new Event("storage"));
+        setSuccessMessage(`Rescue Action Complete! Accepted "${chosenStrategy.name}". Sync complete.`);
+        setSelectedTaskId("");
+        setActionLoading(false);
+        return;
+      }
       
       // 1. Sync to actual Google Calendar via REST API if token is present
       let calendarSyncNote = "";

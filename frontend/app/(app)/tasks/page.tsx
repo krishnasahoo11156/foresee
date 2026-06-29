@@ -73,6 +73,19 @@ export default function TasksPage() {
   // Real-time Firestore query
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalTasks = () => {
+        const stored = localStorage.getItem("foresee-guest-tasks");
+        return stored ? JSON.parse(stored) : [];
+      };
+      setTasksList(getLocalTasks());
+      const handleStorage = () => {
+        setTasksList(JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "tasks"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
@@ -96,6 +109,19 @@ export default function TasksPage() {
   // Subscribe to calendar mappings
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalMappings = () => {
+        const stored = localStorage.getItem("foresee-guest-mappings");
+        return stored ? JSON.parse(stored) : [];
+      };
+      setCalendarMappings(getLocalMappings());
+      const handleStorage = () => {
+        setCalendarMappings(JSON.parse(localStorage.getItem("foresee-guest-mappings") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "calendarMappings"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
@@ -112,6 +138,19 @@ export default function TasksPage() {
   // Subscribe to all subtasks for heatmap workload calculations
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalSubtasks = () => {
+        const stored = localStorage.getItem("foresee-guest-subtasks");
+        return stored ? JSON.parse(stored) : [];
+      };
+      setAllSubtasksList(getLocalSubtasks());
+      const handleStorage = () => {
+        setAllSubtasksList(JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "subtasks"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
@@ -170,6 +209,126 @@ export default function TasksPage() {
           cursor = new Date(end.getTime() + 1 * 3600 * 1000);
           return { title: s.title, startTime: start.toISOString(), endTime: end.toISOString() };
         });
+      }
+
+      // 3. Generate Guest or Firestore IDs
+      if (user.uid === "guest-user-id") {
+        const taskId = `task_${Date.now()}`;
+        const tempTask: any = {
+          id: taskId,
+          taskId: taskId,
+          userId: user.uid,
+          title,
+          estimatedHours: totalHours,
+          difficulty,
+          deadline: deadlineString,
+          isImportant,
+          progress: 0,
+          category: category as any,
+          taskType: taskType as any,
+          executionStyle: executionStyle as any,
+          energyRequirement: energyRequirement as any,
+          interruptionTolerance: interruptionTolerance as any,
+          estimatedConfidence: Number(estimatedConfidence),
+          motivationLevel: motivationLevel as any,
+          requiresInternet,
+          requirements,
+          dependencies,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          lastActivity: new Date().toISOString(),
+          rescueCount: 0,
+          planStabilityIndex: 100,
+          behaviorScore: 100,
+          riskScore: 15,
+          riskLevel: "safe",
+          riskTrend: "stable"
+        };
+
+        const analysis = calculateRiskAndClassification(tempTask, tasksList, profile);
+        const taskDoc = {
+          ...tempTask,
+          riskScore: analysis.riskScore,
+          riskLevel: analysis.riskLevel,
+          completionProbability: analysis.completionProbability,
+          urgency: analysis.urgency,
+          importance: analysis.importance,
+          difficulty: analysis.difficulty,
+          planningState: analysis.planningState,
+          behaviorState: analysis.behaviorState,
+          calendarState: "scheduled" as any,
+          dependencyState: analysis.dependencyState,
+          progressState: analysis.progressState,
+          factors: analysis.factors
+        };
+
+        // Write Task
+        const storedTasks = JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]");
+        localStorage.setItem("foresee-guest-tasks", JSON.stringify([...storedTasks, taskDoc]));
+
+        // Write Subtasks
+        const subtaskWriteList = finalSubtasks.map((st, sIdx) => {
+          const slot = scheduledSlots.find(s => s.title === st.title) || scheduledSlots[sIdx] || {
+            startTime: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
+            endTime: new Date(Date.now() + 3.5 * 3600 * 1000).toISOString()
+          };
+          const subtaskId = `subtask_${Date.now()}_${sIdx}`;
+          return {
+            id: subtaskId,
+            subtaskId,
+            taskId,
+            title: st.title,
+            estimatedHours: st.estimatedHours,
+            isCompleted: false,
+            order: sIdx + 1,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            calendarEventId: `event_mock_${Date.now()}_${sIdx}`
+          };
+        });
+
+        const storedSubtasks = JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]");
+        localStorage.setItem("foresee-guest-subtasks", JSON.stringify([...storedSubtasks, ...subtaskWriteList]));
+
+        // Write calendarMapping
+        const storedMappings = JSON.parse(localStorage.getItem("foresee-guest-mappings") || "[]");
+        const newMapping = {
+          mappingId: `map_${Date.now()}`,
+          syncTimestamp: new Date().toISOString(),
+          status: "synced",
+          source: "AI Auto-Scheduler",
+          scheduledBlocks: scheduledSlots.map((s) => ({
+            title: `[${title}] - ${s.title}`,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            description: `Focus block scheduled via ForeSee.`
+          })),
+          createdAt: new Date().toISOString()
+        };
+        localStorage.setItem("foresee-guest-mappings", JSON.stringify([newMapping, ...storedMappings]));
+
+        // Reset form fields
+        setTitle("");
+        setHours(2);
+        setDifficulty("medium");
+        setIsImportant(false);
+        setCategory("Coding");
+        setTaskType("fixed_deadline");
+        setExecutionStyle("single_session");
+        setEnergyRequirement("medium");
+        setInterruptionTolerance("semi");
+        setEstimatedConfidence(80);
+        setMotivationLevel("neutral");
+        setRequiresInternet(true);
+        setRequirementsInput("laptop");
+        setDependenciesInput("");
+        setSubtasks([]);
+        setNewSubtaskTitle("");
+        closeModal();
+
+        // Dispatch window storage event to sync all local tabs immediately
+        window.dispatchEvent(new Event("storage"));
+        return;
       }
 
       // 3. Generate Firestore IDs

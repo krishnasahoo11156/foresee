@@ -232,9 +232,7 @@ export default function OnboardingPage() {
                     type="button"
                     onClick={() => {
                       signInAsGuest();
-                      setGoogleConnected(true);
-                      setName("Guest Practitioner");
-                      setUsername("guest");
+                      router.push("/dashboard");
                     }}
                     style={{
                       width: "100%",

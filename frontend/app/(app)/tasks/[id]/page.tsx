@@ -21,9 +21,23 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Subscribe to all tasks to calculate sorted risk ranking
+  // Subscribe to all tasks to calculate sorted risk ranking (LocalStorage if Guest)
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalTasks = () => {
+        const stored = localStorage.getItem("foresee-guest-tasks");
+        return stored ? JSON.parse(stored) : [];
+      };
+      setTasksList(getLocalTasks());
+      const handleStorage = () => {
+        setTasksList(JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      setLoading(false);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "tasks"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
@@ -39,9 +53,24 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
     return unsub;
   }, [user]);
 
-  // Subscribe to all subtasks for the task
+  // Subscribe to all subtasks for the task (LocalStorage if Guest)
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalSubtasks = () => {
+        const stored = localStorage.getItem("foresee-guest-subtasks") || "[]";
+        const parsed = JSON.parse(stored);
+        return parsed.filter((s: any) => s.taskId === params.id);
+      };
+      setSubtasksList(getLocalSubtasks().sort((a: any, b: any) => (a.order || 0) - (b.order || 0)));
+      const handleStorage = () => {
+        const parsed = JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]");
+        setSubtasksList(parsed.filter((s: any) => s.taskId === params.id).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "subtasks"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
@@ -121,6 +150,58 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
     if (!user || !originalTask) return;
 
     const newStatus = !subtask.isCompleted;
+
+    if (user.uid === "guest-user-id") {
+      // 1. Update subtask locally
+      const storedSub = JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]");
+      const updatedSub = storedSub.map((s: any) => {
+        if (s.id === subtask.id || s.subtaskId === subtask.id) {
+          return {
+            ...s,
+            isCompleted: newStatus,
+            completedAt: newStatus ? new Date().toISOString() : null
+          };
+        }
+        return s;
+      });
+      localStorage.setItem("foresee-guest-subtasks", JSON.stringify(updatedSub));
+
+      // 2. Recalculate parent task progress & risk
+      const updatedSubtasks = subtasksList.map(s => 
+        s.subtaskId === subtask.subtaskId ? { ...s, isCompleted: newStatus } : s
+      );
+      const completedHours = updatedSubtasks.filter(s => s.isCompleted).reduce((sum, s) => sum + s.estimatedHours, 0);
+      const totalHours = updatedSubtasks.reduce((sum, s) => sum + s.estimatedHours, 0);
+      const newProgress = totalHours > 0 ? Math.min(100, Math.round((completedHours / totalHours) * 100)) : 0;
+
+      const updatedTaskObj = { ...originalTask, progress: newProgress };
+      const newAnalysis = calculateRiskAndClassification(updatedTaskObj, tasksList, profile, updatedSubtasks);
+
+      const storedTasks = JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]");
+      const updatedTasks = storedTasks.map((t: any) => {
+        if (t.id === originalTask.id || t.taskId === originalTask.id) {
+          return {
+            ...t,
+            progress: newProgress,
+            riskScore: newAnalysis.riskScore,
+            riskLevel: newAnalysis.riskLevel,
+            completionProbability: newAnalysis.completionProbability,
+            urgency: newAnalysis.urgency,
+            importance: newAnalysis.importance,
+            behaviorState: newAnalysis.behaviorState,
+            calendarState: newAnalysis.calendarState,
+            progressState: newAnalysis.progressState,
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return t;
+      });
+      localStorage.setItem("foresee-guest-tasks", JSON.stringify(updatedTasks));
+
+      window.dispatchEvent(new Event("storage"));
+      return;
+    }
+
     const subtaskDocRef = doc(db, "users", user.uid, "subtasks", subtask.id || subtask.subtaskId);
 
     try {
@@ -177,6 +258,28 @@ export default function TaskDetailPage({ params }: { params: { id: string } }) {
     if (!user || !originalTask) return;
     setIsDeleting(true);
     setDeleteError(null);
+
+    if (user.uid === "guest-user-id") {
+      try {
+        // 1. Delete subtasks locally
+        const storedSub = JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]");
+        const filteredSub = storedSub.filter((s: any) => s.taskId !== originalTask.id && s.taskId !== originalTask.taskId);
+        localStorage.setItem("foresee-guest-subtasks", JSON.stringify(filteredSub));
+
+        // 2. Delete parent task locally
+        const storedTasks = JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]");
+        const filteredTasks = storedTasks.filter((t: any) => t.id !== originalTask.id && t.taskId !== originalTask.taskId);
+        localStorage.setItem("foresee-guest-tasks", JSON.stringify(filteredTasks));
+
+        // 3. Dispatch storage and redirect
+        window.dispatchEvent(new Event("storage"));
+        router.push("/tasks");
+      } catch (err: any) {
+        setDeleteError(err.message || "Failed to delete task.");
+        setIsDeleting(false);
+      }
+      return;
+    }
 
     try {
       // 1. Delete associated subtasks from Google Calendar if token exists
