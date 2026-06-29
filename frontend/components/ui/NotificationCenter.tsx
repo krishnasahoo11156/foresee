@@ -5,6 +5,7 @@ import {
   Bell, AlertTriangle, Info, Trash2, Shield, 
   Settings, Cloud, Laptop, MessageSquare, Play, X, Mail, Database
 } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
 
 interface AlertItem {
   id: number;
@@ -23,6 +24,7 @@ interface ToastItem {
 }
 
 export function NotificationCenter() {
+  const { user } = useAuth();
   const [alerts, setAlerts] = useState<AlertItem[]>([
     {
       id: 1,
@@ -111,6 +113,42 @@ export function NotificationCenter() {
           setTimeout(() => {
             setToasts(prev => prev.filter(t => t.id !== newId));
           }, 4400);
+        }
+
+        // 3. Dispatch POST email request if enabled
+        if (enableEmail) {
+          const recipientEmail = user?.email || "krishna.sahoo@foresee.com";
+          const recipientName = user?.displayName || "Krish Sahoo";
+
+          fetch("/api/send-email", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              to: recipientEmail,
+              subject: "⚠️ FORESEE CRITICAL RISK ALERT",
+              text: alertText,
+              userName: recipientName
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            setAlerts(prev => [
+              {
+                id: Date.now() + 1,
+                type: "info",
+                category: "Email Dispatch",
+                text: `📧 Email alert dispatched to: ${recipientEmail} (${data.mode === 'real' ? 'Delivered via Resend API' : 'Logged to server console terminal'})`,
+                time: "Just now",
+                isUnread: false
+              },
+              ...prev
+            ]);
+          })
+          .catch(err => {
+            console.error("Failed to dispatch email:", err);
+          });
         }
 
         // Reset simulator
