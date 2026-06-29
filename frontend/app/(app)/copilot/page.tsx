@@ -40,6 +40,19 @@ export default function CopilotPage() {
   // Subscribe to tasks
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalTasks = () => {
+        const stored = localStorage.getItem("foresee-guest-tasks");
+        return stored ? JSON.parse(stored) : [];
+      };
+      setTasksList(getLocalTasks());
+      const handleStorage = () => {
+        setTasksList(JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "tasks"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: Task[] = [];
@@ -63,6 +76,19 @@ export default function CopilotPage() {
   // Subscribe to calendar mappings
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalMappings = () => {
+        const stored = localStorage.getItem("foresee-guest-mappings");
+        return stored ? JSON.parse(stored) : [];
+      };
+      setCalendarMappings(getLocalMappings());
+      const handleStorage = () => {
+        setCalendarMappings(JSON.parse(localStorage.getItem("foresee-guest-mappings") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "calendarMappings"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
@@ -79,6 +105,19 @@ export default function CopilotPage() {
   // Subscribe to subtasks
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalSubtasks = () => {
+        const stored = localStorage.getItem("foresee-guest-subtasks");
+        return stored ? JSON.parse(stored) : [];
+      };
+      setSubtasksList(getLocalSubtasks());
+      const handleStorage = () => {
+        setSubtasksList(JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "subtasks"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
@@ -92,14 +131,60 @@ export default function CopilotPage() {
     return unsub;
   }, [user]);
 
-  // Load chat messages from localStorage on mount
+  // Load chat messages from localStorage on mount (with seeding for guest mode)
   useEffect(() => {
     if (!user) return;
-    const cached = localStorage.getItem(`copilot_messages_${user.uid}`);
+    const cacheKey = `copilot_messages_${user.uid}`;
+    let cached = localStorage.getItem(cacheKey);
+    
+    if (user.uid === "guest-user-id" && !cached) {
+      const today = new Date();
+      const oneHourAgo = new Date(today.getTime() - 3600 * 1000);
+      const fiftyMinAgo = new Date(today.getTime() - 3000 * 1000);
+      const fortyMinAgo = new Date(today.getTime() - 2400 * 1000);
+      
+      const defaults = [
+        {
+          sender: "copilot" as const,
+          text: "Hello! I am your ForeSee AI Copilot. I analyze your tasks, onboarding preferences, and calendar in real-time. Ask me 'How should I complete my tasks?' or 'Plan my coding project' and I will structure a focus schedule for you.",
+          timestamp: oneHourAgo
+        },
+        {
+          sender: "user" as const,
+          text: "Plan my coding project to minimize context switching penalty.",
+          timestamp: fiftyMinAgo
+        },
+        {
+          sender: "copilot" as const,
+          text: "Based on your capacity and preferences, I have compiled your focus block schedule. I've grouped task 'Implement core risk model engine' and task 'Setup Google Calendar OAuth redirect flow' into consecutive slots to protect your cognitive load. Here are the proposed calendar events:",
+          timestamp: fortyMinAgo,
+          proposedEvents: [
+            {
+              title: "Draft risk engine simulation",
+              startTime: new Date(today.getTime() + 10 * 60 * 1000).toISOString(),
+              endTime: new Date(today.getTime() + 130 * 60 * 1000).toISOString(),
+              description: "Deep work session on risk engine formulas.",
+              shiftRequired: false
+            },
+            {
+              title: "OAuth credentials integration",
+              startTime: new Date(today.getTime() + 240 * 60 * 1000).toISOString(),
+              endTime: new Date(today.getTime() + 330 * 60 * 1000).toISOString(),
+              description: "Standard focus block for calendar OAuth integration.",
+              shiftRequired: true,
+              shiftedTaskTitle: "Beta testing with pilot users",
+              shiftedTaskId: "task_3"
+            }
+          ]
+        }
+      ];
+      localStorage.setItem(cacheKey, JSON.stringify(defaults));
+      cached = JSON.stringify(defaults);
+    }
+
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        // Convert timestamp strings back to Date objects
         const formatted = parsed.map((m: any) => ({
           ...m,
           timestamp: new Date(m.timestamp)
@@ -136,6 +221,45 @@ export default function CopilotPage() {
     setMessages(prev => [...prev, { sender: "user", text: userMsg, timestamp: new Date() }]);
     setLoading(true);
 
+    if (user.uid === "guest-user-id") {
+      setTimeout(() => {
+        // AI Copilot analyzes the local guest tasks and replies with smart recommendations
+        const latestTasks = JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]");
+        const taskTitles = latestTasks.map((t: any) => `"${t.title}"`).join(", ");
+        
+        let reply = "";
+        let proposed: ProposedEvent[] = [];
+        
+        if (userMsg.toLowerCase().includes("plan") || userMsg.toLowerCase().includes("schedule")) {
+          reply = `I have analyzed your tasks (${taskTitles || "none"}) and scheduled them. Since your core model engine is slipping, I recommend prioritizing that Deep Work slot today. Here are the proposed calendar sync events:`;
+          proposed = [
+            {
+              title: "Draft risk engine simulation",
+              startTime: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+              endTime: new Date(Date.now() + 135 * 60 * 1000).toISOString(),
+              description: "Focused coding session for Guest Mode.",
+              shiftRequired: false
+            }
+          ];
+        } else {
+          reply = `Hello! I see you are using Guest Mode. You currently have ${latestTasks.length} active tasks: ${taskTitles || "None yet. Go to tasks page to add some!"}. All features are fully operational. Let me know if you would like me to schedule deep work blocks or analyze delay risks.`;
+        }
+
+        setMessages(prev => {
+          const next = [...prev, {
+            sender: "copilot" as const,
+            text: reply,
+            proposedEvents: proposed.length > 0 ? proposed : undefined,
+            timestamp: new Date()
+          }];
+          localStorage.setItem(`copilot_messages_${user.uid}`, JSON.stringify(next));
+          return next;
+        });
+        setLoading(false);
+      }, 1000);
+      return;
+    }
+
     try {
       // Call Gemini with full DB context
       const response = await askCopilot(userMsg, tasksList, profile, calendarMappings, subtasksList);
@@ -163,6 +287,164 @@ export default function CopilotPage() {
     setLoading(true);
     setSuccessMessage("");
     setApiActivationUrl("");
+
+    if (user.uid === "guest-user-id") {
+      try {
+        const syncedBlocks = [];
+        const updatedTasks = [];
+
+        // Load current tasks and subtasks from localStorage
+        const storedTasks = JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]");
+        const storedSubtasks = JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]");
+
+        let updatedTasksList = [...storedTasks];
+        let subtaskWriteList = [...storedSubtasks];
+
+        for (const event of events) {
+          const durationMs = new Date(event.endTime).getTime() - new Date(event.startTime).getTime();
+          const durationHours = Math.max(0.5, Math.round((durationMs / (1000 * 60 * 60)) * 2) / 2);
+
+          const existingTask = updatedTasksList.find(t => 
+            event.title.toLowerCase().includes(t.title.toLowerCase()) || 
+            t.title.toLowerCase().includes(event.title.toLowerCase())
+          );
+
+          let targetTaskId = "";
+
+          if (existingTask) {
+            targetTaskId = existingTask.id || existingTask.taskId;
+            // Update existing task
+            updatedTasksList = updatedTasksList.map((t: any) => {
+              if (t.id === targetTaskId) {
+                const scheduledTimeStr = new Date(event.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                return {
+                  ...t,
+                  deadline: event.endTime,
+                  scheduledTime: scheduledTimeStr,
+                  calendarState: "synced"
+                };
+              }
+              return t;
+            });
+            updatedTasks.push({ title: existingTask.title, id: targetTaskId });
+          } else {
+            // Create a new task locally
+            targetTaskId = `task_${Date.now()}_${Math.floor(Math.random() * 100)}`;
+            const scheduledTimeStr = new Date(event.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            const newTask = {
+              id: targetTaskId,
+              taskId: targetTaskId,
+              userId: user.uid,
+              title: event.title,
+              estimatedHours: durationHours,
+              difficulty: "medium",
+              deadline: event.endTime,
+              isImportant: false,
+              progress: 0,
+              category: "Coding",
+              taskType: "fixed_deadline",
+              executionStyle: "single_session",
+              energyRequirement: "medium",
+              interruptionTolerance: "semi",
+              estimatedConfidence: 80,
+              motivationLevel: "neutral",
+              requiresInternet: true,
+              requirements: ["laptop"],
+              dependencies: [],
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              lastActivity: new Date().toISOString(),
+              rescueCount: 0,
+              planStabilityIndex: 100,
+              behaviorScore: 100,
+              riskScore: 10,
+              riskLevel: "safe",
+              riskTrend: "stable",
+              calendarState: "synced",
+              scheduledTime: scheduledTimeStr
+            };
+            updatedTasksList.push(newTask);
+            updatedTasks.push({ title: event.title, id: targetTaskId });
+          }
+
+          // Create a scheduled subtask locally so it shows on timeline
+          const subtaskId = `subtask_copilot_${Date.now()}_${Math.floor(Math.random() * 100)}`;
+          subtaskWriteList.push({
+            id: subtaskId,
+            subtaskId,
+            taskId: targetTaskId,
+            title: event.title,
+            estimatedHours: durationHours,
+            isCompleted: false,
+            startTime: event.startTime,
+            endTime: event.endTime,
+            calendarEventId: `event_mock_${subtaskId}`
+          });
+
+          syncedBlocks.push({
+            title: event.title,
+            startTime: event.startTime,
+            endTime: event.endTime,
+            description: `${event.description} [ID: ${targetTaskId}]`,
+            taskId: targetTaskId
+          });
+        }
+
+        // Save back to localStorage
+        localStorage.setItem("foresee-guest-tasks", JSON.stringify(updatedTasksList));
+        localStorage.setItem("foresee-guest-subtasks", JSON.stringify(subtaskWriteList));
+
+        // Create mapping log
+        const storedMappings = JSON.parse(localStorage.getItem("foresee-guest-mappings") || "[]");
+        const newMapping = {
+          mappingId: `map_${Date.now()}`,
+          syncTimestamp: new Date().toISOString(),
+          status: "synced",
+          source: "AI Copilot Scheduler",
+          scheduledBlocks: syncedBlocks,
+          createdAt: new Date().toISOString()
+        };
+        localStorage.setItem("foresee-guest-mappings", JSON.stringify([newMapping, ...storedMappings]));
+
+        // Sync shifts locally if required
+        for (const event of events) {
+          if (event.shiftRequired && event.shiftedTaskId) {
+            const shiftedTask = updatedTasksList.find(t => t.id === event.shiftedTaskId || t.taskId === event.shiftedTaskId);
+            if (shiftedTask) {
+              const oldDeadline = new Date(shiftedTask.deadline);
+              const newDeadline = new Date(oldDeadline.getTime() + 24 * 3600 * 1000);
+              
+              updatedTasksList = updatedTasksList.map((t: any) => {
+                if (t.id === shiftedTask.id) {
+                  return {
+                    ...t,
+                    deadline: newDeadline.toISOString(),
+                    behaviorState: "slipping"
+                  };
+                }
+                return t;
+              });
+              localStorage.setItem("foresee-guest-tasks", JSON.stringify(updatedTasksList));
+            }
+          }
+        }
+
+        window.dispatchEvent(new Event("storage"));
+        setSuccessMessage("Calendar Focus Blocks Synchronized Successfully! (Guest Local Simulation Mode)");
+        setMessages(prev => prev.map((m, idx) => {
+          if (idx === messageIndex) {
+            return { ...m, eventsAdded: true };
+          }
+          return m;
+        }));
+      } catch (err) {
+        console.error("Failed to add events in guest mode:", err);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       // 1. Check existing tasks and resolve/generate task IDs

@@ -77,9 +77,22 @@ export default function PlannerPage() {
     }, 1200);
   };
 
-  // Subscribe to user tasks in Firestore
+  // Subscribe to user tasks in Firestore or LocalStorage if Guest
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalTasks = () => {
+        const stored = localStorage.getItem("foresee-guest-tasks");
+        return stored ? JSON.parse(stored) : [];
+      };
+      setDbTasks(getLocalTasks());
+      const handleStorage = () => {
+        setDbTasks(JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "tasks"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
@@ -93,9 +106,22 @@ export default function PlannerPage() {
     return unsub;
   }, [user]);
 
-  // Subscribe to user subtasks in Firestore
+  // Subscribe to user subtasks in Firestore or LocalStorage if Guest
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalSubtasks = () => {
+        const stored = localStorage.getItem("foresee-guest-subtasks");
+        return stored ? JSON.parse(stored) : [];
+      };
+      setDbSubtasks(getLocalSubtasks());
+      const handleStorage = () => {
+        setDbSubtasks(JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "subtasks"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
@@ -109,9 +135,22 @@ export default function PlannerPage() {
     return unsub;
   }, [user]);
 
-  // Subscribe to user calendarMappings in Firestore
+  // Subscribe to user calendarMappings in Firestore or LocalStorage if Guest
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalMappings = () => {
+        const stored = localStorage.getItem("foresee-guest-mappings");
+        return stored ? JSON.parse(stored) : [];
+      };
+      setDbMappings(getLocalMappings());
+      const handleStorage = () => {
+        setDbMappings(JSON.parse(localStorage.getItem("foresee-guest-mappings") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "calendarMappings"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
@@ -232,6 +271,67 @@ export default function PlannerPage() {
     // Check if the item is a real Firestore task/subtask or mock
     const targetItem = scheduleList.find(item => item.id === id);
     if (!targetItem) return;
+
+    if (user.uid === "guest-user-id") {
+      const subtask = dbSubtasks.find(s => s.id === id || s.subtaskId === id);
+      if (subtask) {
+        const start = new Date();
+        const [hoursStr, minutesStr] = editTime.split(":");
+        start.setHours(Number(hoursStr), Number(minutesStr), 0, 0);
+        
+        const duration = subtask.estimatedHours || 1.0;
+        const end = new Date(start.getTime() + duration * 3600 * 1000);
+
+        // Update locally
+        const storedSubtasks = JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]");
+        const updatedSubtasks = storedSubtasks.map((s: any) => {
+          if (s.id === subtask.id || s.subtaskId === subtask.id) {
+            return {
+              ...s,
+              startTime: start.toISOString(),
+              endTime: end.toISOString()
+            };
+          }
+          return s;
+        });
+        localStorage.setItem("foresee-guest-subtasks", JSON.stringify(updatedSubtasks));
+
+        // Add log
+        const storedMappings = JSON.parse(localStorage.getItem("foresee-guest-mappings") || "[]");
+        const newMapping = {
+          mappingId: `map_${Date.now()}`,
+          syncTimestamp: new Date().toISOString(),
+          status: "synced",
+          action: "Manual Reschedule Sync",
+          source: "User Planner Drag",
+          description: `User manually rescheduled subtask focus block: "${subtask.title}"`,
+          changes: [
+            {
+              taskTitle: subtask.title,
+              before: targetItem.time,
+              after: editTime
+            }
+          ],
+          scheduledBlocks: [
+            {
+              title: subtask.title,
+              startTime: start.toISOString(),
+              endTime: end.toISOString(),
+              description: `Focus session. [ID: ${subtask.subtaskId}]`,
+              taskId: subtask.taskId
+            }
+          ],
+          createdAt: new Date().toISOString()
+        };
+        localStorage.setItem("foresee-guest-mappings", JSON.stringify([newMapping, ...storedMappings]));
+
+        window.dispatchEvent(new Event("storage"));
+        triggerSync("Syncing manual reschedule to Google Calendar...");
+      }
+      setMovingItemId(null);
+      setEditTime("");
+      return;
+    }
 
     const logTime = getFormattedTime();
 
@@ -377,6 +477,67 @@ export default function PlannerPage() {
 
     // Check if we have real subtasks in Firestore to rescue
     const uncompletedSubtasks = dbSubtasks.filter(s => s.startTime && !s.isCompleted);
+
+    if (user.uid === "guest-user-id") {
+      if (uncompletedSubtasks.length > 0) {
+        const changesList: any[] = [];
+        const blocksList: any[] = [];
+
+        const storedSubtasks = JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]");
+        const updatedSubtasks = storedSubtasks.map((subtask: any) => {
+          const isUncompleted = uncompletedSubtasks.some(s => s.id === subtask.id || s.subtaskId === subtask.id);
+          if (isUncompleted) {
+            const oldStart = new Date(subtask.startTime);
+            const oldTimeStr = oldStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            
+            const newStart = new Date(oldStart.getTime() + 2 * 3600 * 1000); // Shift by 2 hours
+            const newEnd = new Date(new Date(subtask.endTime).getTime() + 2 * 3600 * 1000);
+            const newTimeStr = newStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+            changesList.push({
+              taskTitle: subtask.title,
+              before: oldTimeStr,
+              after: newTimeStr
+            });
+
+            blocksList.push({
+              title: subtask.title,
+              startTime: newStart.toISOString(),
+              endTime: newEnd.toISOString(),
+              description: `Focus session shifted. [ID: ${subtask.subtaskId}]`,
+              taskId: subtask.taskId
+            });
+
+            return {
+              ...subtask,
+              startTime: newStart.toISOString(),
+              endTime: newEnd.toISOString()
+            };
+          }
+          return subtask;
+        });
+        localStorage.setItem("foresee-guest-subtasks", JSON.stringify(updatedSubtasks));
+
+        // Add mappings log
+        const storedMappings = JSON.parse(localStorage.getItem("foresee-guest-mappings") || "[]");
+        const newMapping = {
+          mappingId: `map_${Date.now()}`,
+          syncTimestamp: new Date().toISOString(),
+          status: "rescued",
+          action: "AI Shift Intervention",
+          source: "AI Co-Optimizer Graph",
+          description: `AI shifted ${changesList.length} focus blocks to protect timeline.`,
+          changes: changesList,
+          scheduledBlocks: blocksList,
+          createdAt: new Date().toISOString()
+        };
+        localStorage.setItem("foresee-guest-mappings", JSON.stringify([newMapping, ...storedMappings]));
+
+        window.dispatchEvent(new Event("storage"));
+        triggerSync("AI Intervention: Re-optimizing Google Calendar schedule...");
+      }
+      return;
+    }
 
     const logTime = getFormattedTime();
 

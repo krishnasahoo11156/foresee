@@ -13,6 +13,121 @@ import { db } from "@/lib/firebase";
 import { metrics as mockMetrics, notifications, schedule } from "@/lib/data";
 import { calculateRiskAndClassification } from "@/lib/riskEngine";
 
+// Dynamic Guest Prepopulated Seeding Helpers
+const getPredefinedTasks = () => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(18, 0, 0, 0);
+
+  const dayAfter = new Date();
+  dayAfter.setDate(dayAfter.getDate() + 2);
+  dayAfter.setHours(18, 0, 0, 0);
+
+  const inFiveDays = new Date();
+  inFiveDays.setDate(inFiveDays.getDate() + 5);
+  inFiveDays.setHours(18, 0, 0, 0);
+
+  return [
+    {
+      id: "task_1",
+      title: "Implement core risk model engine",
+      estimatedHours: 4,
+      deadline: tomorrow.toISOString(),
+      progress: 25,
+      risk: 85,
+      riskLevel: "critical",
+      category: "Coding",
+      isImportant: true,
+      behaviorState: "slipping",
+      originalTime: "10:00"
+    },
+    {
+      id: "task_2",
+      title: "Setup Google Calendar OAuth redirect flow",
+      estimatedHours: 3,
+      deadline: dayAfter.toISOString(),
+      progress: 60,
+      risk: 42,
+      riskLevel: "monitor",
+      category: "Security",
+      isImportant: false,
+      behaviorState: "stable",
+      originalTime: "09:00"
+    },
+    {
+      id: "task_3",
+      title: "Beta testing with pilot users",
+      estimatedHours: 5,
+      deadline: inFiveDays.toISOString(),
+      progress: 0,
+      risk: 10,
+      riskLevel: "safe",
+      category: "Product",
+      isImportant: false,
+      behaviorState: "stable"
+    }
+  ];
+};
+
+const getPredefinedSubtasks = () => {
+  const today10am = new Date();
+  today10am.setHours(10, 0, 0, 0);
+
+  const today2pm = new Date();
+  today2pm.setHours(14, 0, 0, 0);
+
+  const tomorrow9am = new Date();
+  tomorrow9am.setDate(tomorrow9am.getDate() + 1);
+  tomorrow9am.setHours(9, 0, 0, 0);
+
+  const tomorrow1pm = new Date();
+  tomorrow1pm.setDate(tomorrow1pm.getDate() + 1);
+  tomorrow1pm.setHours(13, 0, 0, 0);
+
+  return [
+    {
+      id: "subtask_1",
+      taskId: "task_1",
+      title: "Draft risk engine simulation",
+      estimatedHours: 2,
+      isCompleted: false,
+      startTime: today10am.toISOString(),
+      endTime: new Date(today10am.getTime() + 2 * 3600 * 1000).toISOString(),
+      originalTime: "10:00"
+    },
+    {
+      id: "subtask_2",
+      taskId: "task_1",
+      title: "Write Monte Carlo path generator",
+      estimatedHours: 2,
+      isCompleted: false,
+      startTime: today2pm.toISOString(),
+      endTime: new Date(today2pm.getTime() + 2 * 3600 * 1000).toISOString(),
+      originalTime: "14:00"
+    },
+    {
+      id: "subtask_3",
+      taskId: "task_2",
+      title: "OAuth credentials integration",
+      estimatedHours: 1.5,
+      isCompleted: false,
+      startTime: tomorrow9am.toISOString(),
+      endTime: new Date(tomorrow9am.getTime() + 1.5 * 3600 * 1000).toISOString(),
+      originalTime: "09:00"
+    },
+    {
+      id: "subtask_4",
+      taskId: "task_3",
+      title: "Inspect mobile layout responsiveness",
+      estimatedHours: 2,
+      isCompleted: false,
+      startTime: tomorrow1pm.toISOString(),
+      endTime: new Date(tomorrow1pm.getTime() + 2 * 3600 * 1000).toISOString(),
+      originalTime: "13:00"
+    }
+  ];
+};
+
 export default function DashboardPage() {
   const { theme } = useTheme();
   const { user, profile } = useAuth();
@@ -21,6 +136,25 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalTasks = () => {
+        let stored = localStorage.getItem("foresee-guest-tasks");
+        if (!stored) {
+          const defaults = getPredefinedTasks();
+          localStorage.setItem("foresee-guest-tasks", JSON.stringify(defaults));
+          return defaults;
+        }
+        return JSON.parse(stored);
+      };
+      setTasksList(getLocalTasks());
+
+      const handleStorage = () => {
+        setTasksList(JSON.parse(localStorage.getItem("foresee-guest-tasks") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "tasks"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
@@ -36,6 +170,25 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
+    if (user.uid === "guest-user-id") {
+      const getLocalSubtasks = () => {
+        let stored = localStorage.getItem("foresee-guest-subtasks");
+        if (!stored) {
+          const defaults = getPredefinedSubtasks();
+          localStorage.setItem("foresee-guest-subtasks", JSON.stringify(defaults));
+          return defaults;
+        }
+        return JSON.parse(stored);
+      };
+      setSubtasksList(getLocalSubtasks());
+
+      const handleStorage = () => {
+        setSubtasksList(JSON.parse(localStorage.getItem("foresee-guest-subtasks") || "[]"));
+      };
+      window.addEventListener("storage", handleStorage);
+      return () => window.removeEventListener("storage", handleStorage);
+    }
+
     const q = query(collection(db, "users", user.uid, "subtasks"));
     const unsub = onSnapshot(q, (snapshot) => {
       const items: any[] = [];
