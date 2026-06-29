@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/ui/PageHeader";
-import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
+import { ArchitectureDiagram } from "@/components/ui/ArchitectureDiagram";
 import { HelpCircle } from "lucide-react";
 
 export default function HelpPage() {
@@ -53,7 +53,7 @@ export default function HelpPage() {
         </div>
 
         <div>
-          <ImagePlaceholder label="Technical architecture block diagram" height="340px" />
+          <ArchitectureDiagram />
         </div>
       </div>
     </section>
