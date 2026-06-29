@@ -1337,3 +1337,292 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
   }
 }
 
+/* Settings HUD & Visual Gauges */
+.hud-gauge-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+
+.hud-gauge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transition: all 0.25s var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.hud-gauge-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--muted);
+  box-shadow: var(--shadow-md);
+}
+
+.hud-gauge-circle-container {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-gauge-svg {
+  width: 80px;
+  height: 80px;
+  transform: rotate(-90deg);
+}
+
+.hud-gauge-circle-bg {
+  fill: none;
+  stroke: var(--surface-soft);
+  stroke-width: 6px;
+}
+
+.hud-gauge-circle-value {
+  fill: none;
+  stroke-width: 6px;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hud-gauge-inner-text {
+  position: absolute;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hud-gauge-icon-wrapper {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.hud-gauge-label {
+  margin-top: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--muted-strong);
+  text-align: center;
+}
+
+/* Colors and Glows for Gauges */
+.gauge-blue .hud-gauge-circle-value {
+  stroke: var(--accent);
+}
+.gauge-blue:hover {
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.12);
+}
+.theme-dark .gauge-blue:hover {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+}
+
+.gauge-purple .hud-gauge-circle-value {
+  stroke: #8b5cf6;
+}
+.gauge-purple:hover {
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.12);
+}
+.theme-dark .gauge-purple:hover {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+}
+
+.gauge-pink .hud-gauge-circle-value {
+  stroke: #ec4899;
+}
+.gauge-pink:hover {
+  box-shadow: 0 0 15px rgba(236, 72, 153, 0.12);
+}
+.theme-dark .gauge-pink:hover {
+  box-shadow: 0 0 20px rgba(236, 72, 153, 0.2);
+}
+
+.gauge-teal .hud-gauge-circle-value {
+  stroke: var(--accent-2);
+}
+.gauge-teal:hover {
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.12);
+}
+.theme-dark .gauge-teal:hover {
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.2);
+}
+
+/* Dynamic Calibration Card */
+.hud-calibration-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line);
+  background: var(--surface);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s var(--transition);
+}
+
+.hud-calibration-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+}
+
+.hud-calibration-card.cal-success::before {
+  background: var(--success);
+}
+.hud-calibration-card.cal-success {
+  border-left-color: var(--success);
+}
+
+.hud-calibration-card.cal-warning::before {
+  background: var(--warning);
+}
+.hud-calibration-card.cal-warning {
+  border-left-color: var(--warning);
+}
+
+.hud-calibration-card.cal-optimal::before {
+  background: var(--accent);
+}
+.hud-calibration-card.cal-optimal {
+  border-left-color: var(--accent);
+}
+
+.hud-calibration-card.cal-normal::before {
+  background: var(--muted);
+}
+.hud-calibration-card.cal-normal {
+  border-left-color: var(--muted);
+}
+
+.hud-cal-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+}
+
+.hud-cal-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hud-cal-desc {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted-strong);
+}
+
+/* Slider Controls Styling */
+.hud-slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hud-slider-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hud-slider-value {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.hud-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-soft);
+  outline: none;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.hud-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  transition: transform 0.1s;
+}
+
+.hud-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* Floating Success Toast */
+.hud-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface);
+  border: 1px solid var(--success);
+  border-left-width: 4px;
+  border-left-color: var(--success);
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 9999;
+  animation: toastFadeIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+
+@keyframes toastFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hud-toast-text {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+
