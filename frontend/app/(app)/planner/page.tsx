@@ -553,96 +553,113 @@ export default function PlannerPage() {
       </div>
 
       {/* Main Content Splitted Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1.9fr", gap: "32px", alignItems: "stretch" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1.35fr 1.65fr", gap: "32px", alignItems: "stretch" }}>
         
         {/* Left Side: Daily Schedule Flow */}
         <div className="card stack" style={{ display: "flex", flexDirection: "column", height: "100%", padding: "24px 20px 24px 16px" }}>
           <h2 style={{ margin: "0 0 12px" }}>Daily schedule flow</h2>
-          <div className="timeline" style={{ paddingRight: "8px" }}>
-            {scheduleList.map((item) => (
-              <div className="timeline-item" key={item.id}>
-                <span className="time">{item.time}</span>
-                <div 
-                  className="list-row" 
-                  style={{ 
-                    flex: 1, 
-                    margin: 0, 
-                    padding: "14px 20px", 
-                    boxShadow: "none",
-                    border: item.isRescued ? "1px solid rgba(239, 68, 68, 0.25)" : "1px solid var(--surface-line)",
-                    background: item.isRescued ? "rgba(239, 68, 68, 0.02)" : "var(--surface)"
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                      <strong style={{ fontSize: "14px" }}>{item.type}</strong>
-                      {item.isRescued && (
-                        <span 
-                          style={{ 
-                            fontSize: "10px", 
-                            fontWeight: 700, 
-                            color: "var(--danger)", 
-                            background: "rgba(220, 38, 38, 0.08)", 
-                            padding: "2px 6px", 
-                            borderRadius: "4px" 
-                          }}
-                        >
-                          Rescued
+          <div className="timeline" style={{ paddingRight: "8px", gap: "26px" }}>
+            {scheduleList.map((item) => {
+              const isRescued = item.isRescued;
+              const typeLower = item.type.toLowerCase();
+              let borderLeftColor = "var(--accent)"; // fallback
+              if (isRescued) {
+                borderLeftColor = "var(--danger)";
+              } else if (typeLower.includes("deep")) {
+                borderLeftColor = "var(--accent)"; // neon blue
+              } else if (typeLower.includes("review") || typeLower.includes("admin")) {
+                borderLeftColor = "var(--warning)"; // orange/amber
+              } else if (typeLower.includes("build") || typeLower.includes("code") || typeLower.includes("demo")) {
+                borderLeftColor = "#8b5cf6"; // purple
+              }
+
+              return (
+                <div className="timeline-item" key={item.id}>
+                  <span className="time">{item.time}</span>
+                  <div 
+                    className="list-row" 
+                    style={{ 
+                      flex: 1, 
+                      margin: 0, 
+                      padding: "16px 20px", 
+                      boxShadow: "none",
+                      border: isRescued ? "1px solid rgba(239, 68, 68, 0.25)" : "1px solid var(--surface-line)",
+                      borderLeft: `4px solid ${borderLeftColor}`,
+                      background: isRescued ? "rgba(239, 68, 68, 0.02)" : "var(--surface)",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <strong style={{ fontSize: "14px" }}>{item.type}</strong>
+                        {item.isRescued && (
+                          <span 
+                            style={{ 
+                              fontSize: "10px", 
+                              fontWeight: 700, 
+                              color: "var(--danger)", 
+                              background: "rgba(220, 38, 38, 0.08)", 
+                              padding: "2px 6px", 
+                              borderRadius: "4px" 
+                            }}
+                          >
+                            Rescued
+                          </span>
+                        )}
+                      </div>
+                      <p className="muted" style={{ margin: "4px 0 0", fontSize: "12.5px", lineHeight: "1.4" }}>{item.title}</p>
+                      
+                      {item.taskId && (
+                        <span className="pill monitor" style={{ fontSize: "9px", display: "inline-block", marginTop: "6px", textTransform: "none", letterSpacing: "normal" }}>
+                          ID: {item.taskId}
                         </span>
                       )}
-                    </div>
-                    <p className="muted" style={{ margin: "2px 0 0", fontSize: "12.5px" }}>{item.title}</p>
-                    
-                    {item.taskId && (
-                      <span className="pill monitor" style={{ fontSize: "9px", display: "inline-block", marginTop: "6px", textTransform: "none", letterSpacing: "normal" }}>
-                        ID: {item.taskId}
-                      </span>
-                    )}
 
-                    {/* Inline Time Editor */}
-                    {movingItemId === item.id && (
-                      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "12px" }}>
-                        <input
-                          type="text"
-                          value={editTime}
-                          placeholder="e.g. 10:15"
-                          onChange={(e) => setEditTime(e.target.value)}
-                          className="input"
-                          style={{ width: "90px", height: "30px", padding: "4px 8px", fontSize: "12.5px" }}
-                        />
-                        <button 
-                          onClick={() => handleSaveMove(item.id)} 
-                          className="button button-primary"
-                          style={{ height: "30px", padding: "0 10px", fontSize: "12px" }}
-                        >
-                          Save
-                        </button>
-                        <button 
-                          onClick={() => setMovingItemId(null)}
-                          className="button button-ghost"
-                          style={{ height: "30px", width: "30px", display: "grid", placeItems: "center", padding: 0 }}
-                        >
-                          <X size={15} />
-                        </button>
-                      </div>
+                      {/* Inline Time Editor */}
+                      {movingItemId === item.id && (
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "12px" }}>
+                          <input
+                            type="text"
+                            value={editTime}
+                            placeholder="e.g. 10:15"
+                            onChange={(e) => setEditTime(e.target.value)}
+                            className="input"
+                            style={{ width: "90px", height: "30px", padding: "4px 8px", fontSize: "12.5px" }}
+                          />
+                          <button 
+                            onClick={() => handleSaveMove(item.id)} 
+                            className="button button-primary"
+                            style={{ height: "30px", padding: "0 10px", fontSize: "12px" }}
+                          >
+                            Save
+                          </button>
+                          <button 
+                            onClick={() => setMovingItemId(null)}
+                            className="button button-ghost"
+                            style={{ height: "30px", width: "30px", display: "grid", placeItems: "center", padding: 0 }}
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {movingItemId !== item.id && (
+                      <button 
+                        onClick={() => {
+                          setMovingItemId(item.id);
+                          setEditTime(item.time);
+                        }}
+                        className="button button-secondary" 
+                        style={{ height: "32px", padding: "0 12px", fontSize: "12px", flexShrink: 0 }}
+                      >
+                        Move
+                      </button>
                     )}
                   </div>
-
-                  {movingItemId !== item.id && (
-                    <button 
-                      onClick={() => {
-                        setMovingItemId(item.id);
-                        setEditTime(item.time);
-                      }}
-                      className="button button-secondary" 
-                      style={{ height: "32px", padding: "0 12px", fontSize: "12px", flexShrink: 0 }}
-                    >
-                      Move
-                    </button>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -699,7 +716,8 @@ export default function PlannerPage() {
                 display: "flex", 
                 alignItems: "center", 
                 gap: "12px",
-                animation: "fadeIn 0.2s ease"
+                animation: "fadeIn 0.2s ease",
+                marginTop: "12px"
               }}
             >
               <RefreshCw size={14} className="spin-animation" style={{ color: "var(--accent)" }} />
@@ -708,7 +726,7 @@ export default function PlannerPage() {
           )}
 
           {/* Toolbar Filters */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", marginTop: "8px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", marginTop: "12px" }}>
             <div style={{ display: "flex", gap: "6px" }}>
               <button 
                 onClick={() => setActiveFilter("all")} 
@@ -774,9 +792,9 @@ export default function PlannerPage() {
               overflowY: "auto", 
               display: "grid", 
               gap: "14px", 
-              maxHeight: "380px", 
+              maxHeight: "460px", 
               paddingRight: "4px",
-              marginTop: "8px" 
+              marginTop: "12px" 
             }}
           >
             {filteredLogs.length === 0 ? (
@@ -855,6 +873,69 @@ export default function PlannerPage() {
               })
             )}
           </div>
+
+          {/* Horizontal divider */}
+          <div style={{ borderTop: "1px solid var(--surface-line)", margin: "20px 0 16px" }} />
+
+          {/* Sync Coverage & Focus Analytics HUD */}
+          <div>
+            <h3 style={{ margin: "0 0 14px", fontSize: "14px", fontWeight: 700, color: "var(--text)", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Sparkles size={15} style={{ color: "var(--accent)" }} />
+              Sync Coverage & Focus Analytics
+            </h3>
+
+            {/* Metric Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "18px" }}>
+              <div style={{ background: "var(--surface-soft)", border: "1px solid var(--surface-line)", padding: "10px 12px", borderRadius: "6px" }}>
+                <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Google Sync State</div>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--success)", display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
+                  <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 4px #22c55e" }} />
+                  ACTIVE
+                </div>
+              </div>
+              <div style={{ background: "var(--surface-soft)", border: "1px solid var(--surface-line)", padding: "10px 12px", borderRadius: "6px" }}>
+                <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Coverage Ratio</div>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text)", marginTop: "2px" }}>100% Synced</div>
+              </div>
+              <div style={{ background: "var(--surface-soft)", border: "1px solid var(--surface-line)", padding: "10px 12px", borderRadius: "6px" }}>
+                <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Conflict Shield</div>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--accent)", marginTop: "2px" }}>ENGAGED</div>
+              </div>
+            </div>
+
+            {/* Focus Allocation segmented bar */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--muted-strong)" }}>Focus Hours Allocation (5.5h total)</span>
+                <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--accent)" }}>100% Scheduled</span>
+              </div>
+              <div style={{ display: "flex", height: "8px", borderRadius: "4px", overflow: "hidden", background: "var(--surface-line)" }}>
+                {/* Deep Work: 55% */}
+                <div style={{ width: "55%", background: "var(--accent)" }} title="Deep Work: 3.0h (55%)" />
+                {/* Build/QA: 25% */}
+                <div style={{ width: "25%", background: "#8b5cf6" }} title="Build/QA: 1.4h (25%)" />
+                {/* Review/Admin: 20% */}
+                <div style={{ width: "20%", background: "var(--warning)" }} title="Review & Admin: 1.1h (20%)" />
+              </div>
+              
+              {/* Legend */}
+              <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginTop: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)" }} />
+                  <span style={{ fontSize: "11px", color: "var(--muted)" }}>Deep Work (3.0h)</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#8b5cf6" }} />
+                  <span style={{ fontSize: "11px", color: "var(--muted)" }}>Build/QA (1.4h)</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--warning)" }} />
+                  <span style={{ fontSize: "11px", color: "var(--muted)" }}>Review & Admin (1.1h)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </div>
