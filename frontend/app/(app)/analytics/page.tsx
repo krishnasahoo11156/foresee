@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
+import { AnalyticsVisuals } from "@/components/ui/AnalyticsVisuals";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { useAuth } from "@/components/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
@@ -126,7 +126,7 @@ export default function AnalyticsPage() {
       </div>
 
       <div style={{ marginBottom: "32px" }}>
-        <ImagePlaceholder label="Timeline risk tracking heat-map and delay vector trajectory chart" height="240px" />
+        <AnalyticsVisuals tasks={tasksList} profile={profile} />
       </div>
 
       <div className="grid grid-4" style={{ gap: "20px", marginBottom: "32px" }}>

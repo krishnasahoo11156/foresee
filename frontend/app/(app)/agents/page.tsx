@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/ui/PageHeader";
-import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
+import { SequenceFlow } from "@/components/ui/SequenceFlow";
 import { agents } from "@/lib/data";
 import { Bot } from "lucide-react";
 
@@ -17,7 +17,7 @@ export default function AgentsPage() {
       </div>
 
       <div style={{ marginBottom: "32px" }}>
-        <ImagePlaceholder label="Orchestration agent sequence flow diagram" height="200px" />
+        <SequenceFlow />
       </div>
 
       <div className="grid grid-3" style={{ gap: "20px" }}>
