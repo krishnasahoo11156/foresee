@@ -529,7 +529,7 @@ export function AnalyticsVisuals({ tasks, profile }: AnalyticsVisualsProps) {
                   <span className="muted">Monday calendar blocks have overloaded capacity thresholds.</span>
                 </div>
                 <div style={{ fontSize: "11px", lineHeight: "1.4", padding: "6px 8px", background: "rgba(245, 158, 11, 0.08)", borderLeft: "2.5px solid #f59e0b", borderRadius: "0 4px 4px 0" }}>
-                  <div style={{ fontWeight: 700, color: "#f59e0b" }}>4h ago: Task 'Calendar Sync' Risk Spike</div>
+                  <div style={{ fontWeight: 700, color: "#f59e0b" }}>4h ago: Task &apos;Calendar Sync&apos; Risk Spike</div>
                   <span className="muted">Workload variance exceeded 60% probability.</span>
                 </div>
                 <div style={{ fontSize: "11px", lineHeight: "1.4", padding: "6px 8px", background: "rgba(16, 185, 129, 0.08)", borderLeft: "2.5px solid #10b981", borderRadius: "0 4px 4px 0" }}>
