@@ -1,7 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/ui/PageHeader";
-import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
+import { ProductivityAnalytics } from "@/components/ui/ProductivityAnalytics";
 import { Activity, ToggleLeft } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -36,7 +36,7 @@ export default function ProfilePage() {
       </div>
 
       <div style={{ marginBottom: "32px" }}>
-        <ImagePlaceholder label="User focus intensity graph and cognitive load analytics dashboard" height="200px" />
+        <ProductivityAnalytics />
       </div>
 
       <div className="grid grid-2" style={{ gap: "32px", alignItems: "stretch" }}>
