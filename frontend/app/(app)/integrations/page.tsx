@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/ui/PageHeader";
-import { ImagePlaceholder } from "@/components/ui/ImagePlaceholder";
+import { SyncVisualizer } from "@/components/ui/SyncVisualizer";
 import { integrations } from "@/lib/data";
 import { Puzzle } from "lucide-react";
 
@@ -17,7 +17,7 @@ export default function IntegrationsPage() {
       </div>
 
       <div style={{ marginBottom: "32px" }}>
-        <ImagePlaceholder label="GCP and Firebase infrastructure sync flow diagram" height="200px" />
+        <SyncVisualizer />
       </div>
 
       <div className="grid grid-3" style={{ gap: "20px" }}>

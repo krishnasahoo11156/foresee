@@ -1625,4 +1625,282 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
   color: var(--text);
 }
 
+/* GCP/Firebase Sync Visualizer styles */
+.sync-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow: hidden;
+}
+
+.sync-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.sync-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sync-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--surface-line);
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s var(--transition);
+}
+
+.sync-btn:hover:not(:disabled) {
+  border-color: var(--muted);
+  background: var(--surface-line);
+}
+
+.sync-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.sync-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* SVG Canvas layout */
+.sync-canvas-wrapper {
+  width: 100%;
+  background: radial-gradient(circle at center, rgba(0,0,0,0.01) 1px, transparent 1px);
+  background-size: 16px 16px;
+  border: 1px dashed var(--surface-line);
+  border-radius: var(--radius);
+  padding: 16px;
+  position: relative;
+}
+.theme-dark .sync-canvas-wrapper {
+  background: radial-gradient(circle at center, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.sync-canvas {
+  width: 100%;
+  height: auto;
+  min-height: 220px;
+  overflow: visible;
+}
+
+/* Nodes styling */
+.sync-node-group {
+  cursor: pointer;
+}
+
+.sync-node-rect {
+  fill: var(--surface);
+  stroke: var(--surface-line);
+  stroke-width: 1.5;
+  rx: 8px;
+  ry: 8px;
+  transition: all 0.3s var(--transition);
+}
+
+.sync-node-icon-bg {
+  fill: var(--surface-soft);
+  transition: all 0.3s var(--transition);
+}
+
+.sync-node-icon {
+  fill: var(--muted);
+  transition: all 0.3s var(--transition);
+}
+
+.sync-node-title {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--text);
+  user-select: none;
+}
+
+.sync-node-subtitle {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  fill: var(--muted);
+  user-select: none;
+}
+
+/* Active Node glows */
+.sync-node-group.node-active .sync-node-rect {
+  stroke-width: 2px;
+}
+
+.sync-node-group.node-active.node-client .sync-node-rect {
+  stroke: var(--accent);
+  filter: drop-shadow(0 0 8px rgba(37, 99, 235, 0.3));
+}
+
+.sync-node-group.node-active.node-auth .sync-node-rect {
+  stroke: #f59e0b;
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.3));
+}
+
+.sync-node-group.node-active.node-firestore .sync-node-rect {
+  stroke: #ef4444;
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.3));
+}
+
+.sync-node-group.node-active.node-pubsub .sync-node-rect {
+  stroke: #10b981;
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.3));
+}
+
+.sync-node-group.node-active.node-calendar .sync-node-rect {
+  stroke: var(--accent-2);
+  filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.3));
+}
+
+.sync-node-group.node-active.node-gemini .sync-node-rect {
+  stroke: #8b5cf6;
+  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.3));
+}
+
+/* Sync lines */
+.sync-line {
+  fill: none;
+  stroke: var(--surface-line);
+  stroke-width: 2px;
+  transition: stroke 0.3s;
+}
+
+.sync-line-active {
+  stroke-width: 3px;
+  stroke-dasharray: 6 4;
+  animation: syncLineFlow 0.8s linear infinite;
+}
+
+.sync-line-active.flow-blue {
+  stroke: var(--accent);
+}
+.sync-line-active.flow-orange {
+  stroke: #f59e0b;
+}
+.sync-line-active.flow-red {
+  stroke: #ef4444;
+}
+.sync-line-active.flow-green {
+  stroke: #10b981;
+}
+.sync-line-active.flow-purple {
+  stroke: #8b5cf6;
+}
+.sync-line-active.flow-cyan {
+  stroke: var(--accent-2);
+}
+
+@keyframes syncLineFlow {
+  0% {
+    stroke-dashoffset: 10;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Terminal Mock Console */
+.sync-terminal {
+  background: #0f172a;
+  border-radius: var(--radius);
+  border: 1px solid #1e293b;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  height: 140px;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-bar {
+  background: #1e293b;
+  padding: 6px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #334155;
+}
+
+.terminal-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.terminal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-red { background: #ef4444; }
+.dot-yellow { background: #f59e0b; }
+.dot-green { background: #10b981; }
+
+.terminal-title {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.terminal-body {
+  padding: 12px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.terminal-log-row {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #38bdf8;
+  display: flex;
+  gap: 8px;
+}
+
+.log-time {
+  color: #64748b;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.log-text {
+  color: #cbd5e1;
+}
+
+.log-success {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.log-pending {
+  color: #fbbf24;
+}
+
+
 
