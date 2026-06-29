@@ -35,7 +35,7 @@ export default function CopilotPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [hasCalendarToken, setHasCalendarToken] = useState(false);
   const [apiActivationUrl, setApiActivationUrl] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to tasks
   useEffect(() => {
@@ -117,9 +117,12 @@ export default function CopilotPage() {
     localStorage.setItem(`copilot_messages_${user.uid}`, JSON.stringify(messages));
   }, [user, messages]);
 
-  // Scroll to bottom of chat
+  // Theme-responsive container-only auto-scroll (avoids parent page scrolling/jumping/flickering)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = chatContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [messages, loading]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -440,7 +443,7 @@ export default function CopilotPage() {
         <div className="card card-pad" style={{ padding: "28px", gridColumn: "span 2", display: "flex", flexDirection: "column", height: "70vh", justifyContent: "space-between", background: "var(--surface)" }}>
           
           {/* Scrollable messages log */}
-          <div style={{ overflowY: "auto", flex: 1, paddingRight: "8px", display: "flex", flexDirection: "column", gap: "20px", marginBottom: "20px" }}>
+          <div ref={chatContainerRef} style={{ overflowY: "auto", flex: 1, paddingRight: "8px", display: "flex", flexDirection: "column", gap: "20px", marginBottom: "20px" }}>
             {messages.map((msg, idx) => {
               const isCopilot = msg.sender === "copilot";
               return (
@@ -567,7 +570,6 @@ export default function CopilotPage() {
                 <span className="muted" style={{ fontWeight: 500 }}>ForeSee Copilot is analyzing scheduling windows and planning...</span>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* User message input field */}

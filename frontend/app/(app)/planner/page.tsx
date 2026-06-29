@@ -792,7 +792,7 @@ export default function PlannerPage() {
               overflowY: "auto", 
               display: "grid", 
               gap: "14px", 
-              maxHeight: "460px", 
+              minHeight: "520px", 
               paddingRight: "4px",
               marginTop: "12px" 
             }}

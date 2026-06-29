@@ -46,6 +46,7 @@ type AuthContextValue = {
   profile: any;
   loading: boolean;
   signInWithGoogle: () => Promise<User>;
+  signInAsGuest: () => void;
   signOut: () => Promise<void>;
   saveUserProfile: (payload?: ProfilePayload) => Promise<void>;
 };
@@ -57,11 +58,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Setup guest baseline profile data
+  const getGuestProfile = () => ({
+    name: "Guest Practitioner",
+    username: "guest",
+    preferences: {
+      profession: "Software Engineer",
+      workStart: "09:00",
+      workEnd: "17:00",
+      theme: "dark",
+      deepWorkHours: 4,
+      preferredSessionLength: 50,
+      maxDailyDeepWork: 3,
+      maxTotalWork: 8,
+      weekendAvailability: false,
+      lunchStart: "12:00",
+      lunchEnd: "13:00",
+      meetingHeavy: false,
+      notificationPreference: "high",
+      calendarStrictness: 2,
+      procrastinationLevel: 2,
+      averageSleep: 7,
+      stressLevel: "medium",
+      riskTolerance: "medium",
+      taskSwitchingAbility: "medium",
+      contextSwitchingCost: 15,
+      breakFrequency: 25,
+      focusRecoveryTime: 10
+    },
+    metrics: {
+      averageCompletionRate: 0.85,
+      averageDelayHours: 0.5,
+      deepWorkCapacity: 4,
+      burnoutScore: 15,
+      reliabilityScore: 88,
+      focusScore: 82,
+      planningAccuracy: 0.90
+    }
+  });
+
   useEffect(() => {
     initAnalytics().catch(() => null);
     let unsubProfile: (() => void) | null = null;
 
+    // Load guest mode on mount immediately if flag is active
+    if (typeof window !== "undefined" && localStorage.getItem("foresee-guest-mode") === "true") {
+      setUser({
+        uid: "guest-user-id",
+        displayName: "Guest Practitioner",
+        email: "guest@foresee.ai",
+        photoURL: null
+      } as any);
+      setProfile(getGuestProfile());
+      setLoading(false);
+    }
+
     const unsubAuth = onAuthStateChanged(auth, (nextUser) => {
+      if (typeof window !== "undefined" && localStorage.getItem("foresee-guest-mode") === "true") {
+        // Halt firebase cleanups if mock session is running
+        return;
+      }
       setUser(nextUser);
       
       if (unsubProfile) {
@@ -95,7 +151,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const saveUserProfile = useCallback(async (payload: ProfilePayload = {}) => {
     const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    if (!currentUser) {
+      if (typeof window !== "undefined" && localStorage.getItem("foresee-guest-mode") === "true") {
+        setProfile((prev: any) => {
+          const updated = { ...prev, ...payload };
+          const updatedPrefs = { ...(prev?.preferences || {}), ...payload };
+          
+          if (payload.deepWorkHours !== undefined) updatedPrefs.deepWorkHours = Number(payload.deepWorkHours);
+          if (payload.preferredSessionLength !== undefined) updatedPrefs.preferredSessionLength = Number(payload.preferredSessionLength);
+          if (payload.maxDailyDeepWork !== undefined) updatedPrefs.maxDailyDeepWork = Number(payload.maxDailyDeepWork);
+          if (payload.maxTotalWork !== undefined) updatedPrefs.maxTotalWork = Number(payload.maxTotalWork);
+          if (payload.calendarStrictness !== undefined) updatedPrefs.calendarStrictness = Number(payload.calendarStrictness);
+          if (payload.procrastinationLevel !== undefined) updatedPrefs.procrastinationLevel = Number(payload.procrastinationLevel);
+          if (payload.averageSleep !== undefined) updatedPrefs.averageSleep = Number(payload.averageSleep);
+          if (payload.contextSwitchingCost !== undefined) updatedPrefs.contextSwitchingCost = Number(payload.contextSwitchingCost);
+          if (payload.breakFrequency !== undefined) updatedPrefs.breakFrequency = Number(payload.breakFrequency);
+          if (payload.focusRecoveryTime !== undefined) updatedPrefs.focusRecoveryTime = Number(payload.focusRecoveryTime);
+
+          updated.preferences = updatedPrefs;
+          return updated;
+        });
+      }
+      return;
+    }
 
     const dataToSave: any = {
       uid: currentUser.uid,
@@ -147,7 +225,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (Object.keys(preferences).length > 0) {
       dataToSave.preferences = preferences;
-      // Initialize matching metrics
       dataToSave.metrics = {
         averageCompletionRate: 0.85,
         averageDelayHours: 0.5,
@@ -181,9 +258,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.warn("signInWithPopup blocked or failed. Falling back to signInWithRedirect:", error);
       await signInWithRedirect(auth, googleProvider);
-      return new Promise<User>(() => {}); // Hold execution until redirect initiates
+      return new Promise<User>(() => {}); 
     }
   }, [saveUserProfile]);
+
+  const signInAsGuest = useCallback(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("foresee-guest-mode", "true");
+    }
+    setUser({
+      uid: "guest-user-id",
+      displayName: "Guest Practitioner",
+      email: "guest@foresee.ai",
+      photoURL: null
+    } as any);
+    setProfile(getGuestProfile());
+    setLoading(false);
+  }, []);
+
+  const signOut = useCallback(async () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("foresee-guest-mode");
+    }
+    await firebaseSignOut(auth);
+    setUser(null);
+    setProfile(null);
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -191,10 +291,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       loading,
       signInWithGoogle,
-      signOut: () => firebaseSignOut(auth),
+      signInAsGuest,
+      signOut,
       saveUserProfile
     }),
-    [user, profile, loading, signInWithGoogle, saveUserProfile]
+    [user, profile, loading, signInWithGoogle, signInAsGuest, signOut, saveUserProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

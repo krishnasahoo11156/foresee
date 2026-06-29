@@ -11,7 +11,7 @@ import { db } from "@/lib/firebase";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, signInWithGoogle, saveUserProfile, signOut } = useAuth();
+  const { user, signInWithGoogle, signInAsGuest, saveUserProfile, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const [step, setStep] = useState(1);
   const [googleConnected, setGoogleConnected] = useState(Boolean(user));
@@ -102,8 +102,8 @@ export default function OnboardingPage() {
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!googleConnected) {
-      setAuthError("Please connect your Google account first.");
+    if (!googleConnected && localStorage.getItem("foresee-guest-mode") !== "true") {
+      setAuthError("Please connect Google account or use Guest Mode first.");
       return;
     }
     if (!name || !username || !password) return;
@@ -189,7 +189,7 @@ export default function OnboardingPage() {
                 </p>
               </div>
 
-              <div style={{ display: "grid", gap: "16px" }}>
+              <div style={{ display: "grid", gap: "12px" }}>
                 <button
                   type="button"
                   onClick={handleGoogleConnect}
@@ -226,6 +226,36 @@ export default function OnboardingPage() {
                     {googleConnecting ? "Connecting..." : googleConnected ? "Google Connected ✓" : "Sign in with Google"}
                   </span>
                 </button>
+
+                {!googleConnected && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      signInAsGuest();
+                      setGoogleConnected(true);
+                      setName("Guest Practitioner");
+                      setUsername("guest");
+                    }}
+                    style={{
+                      width: "100%",
+                      height: "44px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "12px",
+                      background: "var(--surface-soft)",
+                      color: "var(--text)",
+                      border: "1px solid var(--surface-line)",
+                      borderRadius: "8px",
+                      fontWeight: 500,
+                      fontSize: "14px",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
+                    }}
+                  >
+                    <span>Continue as Guest / Developer Bypass</span>
+                  </button>
+                )}
 
                 {authError && (
                   <div className="muted" style={{ color: "var(--danger)", fontSize: "13px", lineHeight: "1.4" }}>
