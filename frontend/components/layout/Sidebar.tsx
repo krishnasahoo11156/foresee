@@ -9,8 +9,11 @@ import { useAuth } from "@/components/AuthProvider";
 export function Brand({ collapsed }: { collapsed?: boolean }) {
   return (
     <Link className="brand" href="/dashboard" aria-label="ForeSee dashboard">
-      <span className="brand-mark"><Eye size={19} /></span>
-      <span className="brand-text">ForeSee</span>
+      <span className="brand-mark" style={{ background: "none" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="ForeSee Logo" style={{ width: "30px", height: "30px", objectFit: "contain", borderRadius: "6px" }} />
+      </span>
+      <span className="brand-text" style={{ fontSize: "16px", fontWeight: "800", letterSpacing: "-0.03em" }}>ForeSee</span>
     </Link>
   );
 }

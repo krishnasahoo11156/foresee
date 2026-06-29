@@ -13,7 +13,10 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: "ForeSee — AI Deadline Rescue",
-  description: "AI-powered deadline rescue and predictive productivity platform"
+  description: "AI-powered deadline rescue and predictive productivity platform",
+  icons: {
+    icon: "/logo.png"
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
