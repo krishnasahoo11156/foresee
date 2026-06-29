@@ -1902,6 +1902,277 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
   color: #fbbf24;
 }
 
+/* Orchestration Sequence Flow Diagram styles */
+.seq-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow: hidden;
+}
+
+.seq-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.seq-btn-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.seq-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--surface-line);
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s var(--transition);
+}
+
+.seq-btn:hover:not(:disabled) {
+  border-color: var(--muted);
+  background: var(--surface-line);
+}
+
+.seq-btn.btn-active {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
+.seq-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* SVG Sequence Diagram */
+.seq-canvas-wrapper {
+  width: 100%;
+  border: 1px dashed var(--surface-line);
+  border-radius: var(--radius);
+  padding: 16px 8px;
+  background: rgba(0,0,0,0.01);
+  overflow-x: auto;
+}
+.theme-dark .seq-canvas-wrapper {
+  background: rgba(255,255,255,0.005);
+}
+
+.seq-canvas {
+  width: 100%;
+  height: auto;
+  min-height: 300px;
+  overflow: visible;
+}
+
+/* Lifelines and Arrow Elements */
+.seq-lifeline-rect {
+  fill: var(--surface);
+  stroke: var(--surface-line);
+  stroke-width: 1.5px;
+  rx: 6px;
+  ry: 6px;
+  transition: all 0.3s var(--transition);
+}
+
+.seq-lifeline-line {
+  stroke: var(--surface-line);
+  stroke-dasharray: 4 4;
+  stroke-width: 1.5px;
+  transition: stroke 0.3s;
+}
+
+.seq-lifeline-text {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--text);
+  user-select: none;
+}
+
+/* Active Lifeline */
+.lifeline-active .seq-lifeline-rect {
+  stroke-width: 2px;
+}
+.lifeline-active.node-client .seq-lifeline-rect {
+  stroke: var(--accent);
+  fill: var(--accent-soft);
+  filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.25));
+}
+.lifeline-active.node-orchestrator .seq-lifeline-rect {
+  stroke: #8b5cf6;
+  fill: rgba(139, 92, 246, 0.08);
+  filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.25));
+}
+.lifeline-active.node-risk .seq-lifeline-rect {
+  stroke: #ef4444;
+  fill: rgba(239, 68, 68, 0.08);
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.25));
+}
+.lifeline-active.node-sim .seq-lifeline-rect {
+  stroke: #ec4899;
+  fill: rgba(236, 72, 153, 0.08);
+  filter: drop-shadow(0 0 6px rgba(236, 72, 153, 0.25));
+}
+.lifeline-active.node-scheduler .seq-lifeline-rect {
+  stroke: var(--accent-2);
+  fill: var(--accent-2-soft);
+  filter: drop-shadow(0 0 6px rgba(6, 182, 212, 0.25));
+}
+
+.lifeline-active .seq-lifeline-line {
+  stroke: var(--muted);
+}
+
+/* Arrow messages */
+.seq-arrow-group {
+  cursor: pointer;
+}
+
+.seq-arrow-line {
+  fill: none;
+  stroke: var(--surface-line);
+  stroke-dasharray: 4 2;
+  stroke-width: 1.5px;
+  transition: all 0.3s var(--transition);
+}
+
+.seq-arrow-line-active {
+  stroke-width: 2.5px;
+  stroke-dasharray: none;
+  animation: seqArrowGlow 1.5s infinite alternate;
+}
+
+.flow-step-blue {
+  stroke: var(--accent);
+}
+.flow-step-purple {
+  stroke: #8b5cf6;
+}
+.flow-step-red {
+  stroke: #ef4444;
+}
+.flow-step-pink {
+  stroke: #ec4899;
+}
+.flow-step-cyan {
+  stroke: var(--accent-2);
+}
+
+.seq-arrow-label {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  fill: var(--muted-strong);
+  transition: fill 0.3s;
+}
+
+.seq-arrow-group.active-step .seq-arrow-label {
+  fill: var(--text);
+}
+
+/* Glowing data packet */
+.seq-particle {
+  fill: #ffffff;
+  stroke-width: 1px;
+  filter: drop-shadow(0 0 4px #ffffff);
+}
+
+.particle-blue {
+  fill: var(--accent);
+  stroke: var(--accent);
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+.particle-purple {
+  fill: #8b5cf6;
+  stroke: #8b5cf6;
+  filter: drop-shadow(0 0 6px #8b5cf6);
+}
+.particle-red {
+  fill: #ef4444;
+  stroke: #ef4444;
+  filter: drop-shadow(0 0 6px #ef4444);
+}
+.particle-pink {
+  fill: #ec4899;
+  stroke: #ec4899;
+  filter: drop-shadow(0 0 6px #ec4899);
+}
+.particle-cyan {
+  fill: var(--accent-2);
+  stroke: var(--accent-2);
+  filter: drop-shadow(0 0 6px var(--accent-2));
+}
+
+@keyframes seqArrowGlow {
+  from {
+    filter: drop-shadow(0 0 1px rgba(255,255,255,0.1));
+  }
+  to {
+    filter: drop-shadow(0 0 4px rgba(255,255,255,0.6));
+  }
+}
+
+/* Action Summary Details Card */
+.seq-description-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line);
+  background: var(--surface);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.seq-desc-accent-bar {
+  height: 4px;
+  width: 100%;
+}
+
+.desc-accent-blue { background: var(--accent); }
+.desc-accent-purple { background: #8b5cf6; }
+.desc-accent-red { background: #ef4444; }
+.desc-accent-pink { background: #ec4899; }
+.desc-accent-cyan { background: var(--accent-2); }
+
+.seq-desc-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seq-desc-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.seq-desc-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted-strong);
+}
+
+
 /* Monte Carlo Simulator styles */
 .mc-card {
   border-radius: var(--radius-lg);
