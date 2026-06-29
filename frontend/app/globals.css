@@ -2450,6 +2450,311 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
   r: 6px;
 }
 
+/* Real-time Notification Center & FCM Simulator styles */
+.nc-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--surface-line);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.nc-layout-split {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 950px) {
+  .nc-layout-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nc-section-title {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Config preferences panel */
+.nc-config-card {
+  background: var(--surface-soft);
+  border: 1px solid var(--surface-line);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nc-preference-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nc-pref-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nc-pref-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.nc-pref-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* Toggle Switch Checkbox Styling (iOS look) */
+.nc-switch-input {
+  display: none;
+}
+
+.nc-switch-label {
+  width: 38px;
+  height: 20px;
+  background: var(--surface-line);
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.3s;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.nc-switch-label::after {
+  content: "";
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.nc-switch-input:checked + .nc-switch-label {
+  background: var(--accent);
+}
+
+.nc-switch-input:checked + .nc-switch-label::after {
+  transform: translateX(18px);
+}
+
+/* Notification List items */
+.nc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.nc-item-row {
+  border-radius: var(--radius);
+  border: 1px solid var(--surface-line);
+  background: var(--surface);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s ease;
+  animation: ncItemInsert 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes ncItemInsert {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nc-item-row.unread {
+  background: var(--surface-soft);
+  border-color: var(--accent-soft);
+}
+
+.nc-border-critical {
+  border-left: 4px solid var(--danger);
+}
+
+.nc-border-warning {
+  border-left: 4px solid var(--warning);
+}
+
+.nc-border-info {
+  border-left: 4px solid var(--accent);
+}
+
+.nc-item-icon-wrapper {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.nc-bg-critical { background: rgba(220, 38, 38, 0.1); color: var(--danger); }
+.nc-bg-warning { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+.nc-bg-info { background: rgba(37, 99, 235, 0.1); color: var(--accent); }
+
+.nc-dismiss-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.nc-dismiss-btn:hover {
+  background: var(--surface-line);
+  color: var(--text);
+}
+
+/* Cloud FCM Pipeline Visualizer panel */
+.nc-flow-panel {
+  border: 1px dashed var(--surface-line);
+  background: rgba(0,0,0,0.01);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.theme-dark .nc-flow-panel {
+  background: rgba(255, 255, 255, 0.005);
+}
+
+.nc-flow-line {
+  fill: none;
+  stroke: var(--surface-line);
+  stroke-width: 1.5px;
+  transition: all 0.3s;
+}
+
+.nc-flow-line-active {
+  stroke-width: 2.5px;
+  stroke-dasharray: 5 4;
+  animation: ncFlowDash 0.8s linear infinite;
+}
+
+.flow-red { stroke: var(--danger); }
+.flow-amber { stroke: var(--warning); }
+.flow-blue { stroke: var(--accent); }
+
+@keyframes ncFlowDash {
+  0% { stroke-dashoffset: 9; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.nc-flow-text {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 700;
+  fill: var(--muted);
+  user-select: none;
+}
+
+.nc-flow-node-rect {
+  fill: var(--surface);
+  stroke: var(--surface-line);
+  stroke-width: 1.5px;
+  rx: 6px;
+  ry: 6px;
+  transition: all 0.3s;
+}
+
+.nc-flow-node-active .nc-flow-node-rect {
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 5px rgba(220, 38, 38, 0.25));
+}
+
+.nc-flow-node-active.node-fcm .nc-flow-node-rect {
+  stroke: #ffca28;
+}
+.nc-flow-node-active.node-functions .nc-flow-node-rect {
+  stroke: #8b5cf6;
+}
+.nc-flow-node-active.node-firestore .nc-flow-node-rect {
+  stroke: #ef4444;
+}
+.nc-flow-node-active.node-client .nc-flow-node-rect {
+  stroke: var(--accent);
+}
+
+/* Floating HUD Toast Notification */
+.nc-toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.nc-toast-card {
+  pointer-events: auto;
+  width: 320px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  transform: translateX(360px);
+  opacity: 0;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: ncToastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes ncToastSlideIn {
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.nc-toast-card.slide-out {
+  animation: ncToastSlideOut 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes ncToastSlideOut {
+  to {
+    transform: translateX(360px);
+    opacity: 0;
+  }
+}
+
+
 
 
 /* Monte Carlo Simulator styles */
